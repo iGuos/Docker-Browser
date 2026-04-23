@@ -6,7 +6,6 @@ import {
   useState,
   type PointerEvent as ReactPointerEvent,
   type ReactNode,
-  type TextareaHTMLAttributes,
 } from 'react'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import { useTranslation } from 'react-i18next'
@@ -36,8 +35,6 @@ import {
   MIN_COL_PX,
   type ContainerTableColId,
 } from '@/lib/containerTablePreferences'
-import { loadExecHistory, pushExecHistory } from '@/lib/execCommandHistory'
-
 type Row = {
   Id: string
   Names?: string[]
@@ -133,7 +130,7 @@ function containerStateLower(c: Row | null | undefined): string {
   return (c?.State ?? '').toLowerCase()
 }
 
-/** 一次性执行、容器内文件、stats 快照等：仅「运行中」可用 */
+/** 执行指令窗口、容器内文件、stats 快照等：仅「运行中」可用 */
 function isStrictRunning(c: Row | null | undefined): boolean {
   if (!c) return false
   return containerStateLower(c) === 'running'
@@ -172,7 +169,7 @@ function canUseUnpause(c: Row | null | undefined): boolean {
   return containerStateLower(c) === 'paused'
 }
 
-const CTX_MENU_COUNT = 6
+const CTX_MENU_COUNT = 7
 
 const BTN_DISABLED = 'disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-40'
 
@@ -180,11 +177,6 @@ export function ContainersView() {
   const { t, i18n } = useTranslation()
   const { alert, confirm } = useAppDialog()
   const [showCreate, setShowCreate] = useState(false)
-  const [execCmd, setExecCmd] = useState('ls -la')
-  const [execHistoryList, setExecHistoryList] = useState(() => loadExecHistory())
-  const [execTimeoutSec, setExecTimeoutSec] = useState('120')
-  const [execOut, setExecOut] = useState('')
-  const [execBusy, setExecBusy] = useState(false)
   const [collapsedProjectKeys, setCollapsedProjectKeys] = useState<Set<string>>(() => new Set())
   const ctxMenuRef = useRef<HTMLDivElement>(null)
   const ctxMenuIndexRef = useRef(0)
@@ -398,6 +390,12 @@ export function ContainersView() {
     })
   }, [alert, t])
 
+  const openExecWindow = useCallback((containerId: string) => {
+    void window.dockerDesktop.openContainerExecWindow(containerId).then(async (res) => {
+      if (!res.ok) await alertEngineError(alert, t, res.error)
+    })
+  }, [alert, t])
+
   const openFilesWindow = useCallback((containerId: string) => {
     void window.dockerDesktop.openContainerFilesWindow(containerId, '/').then(async (res) => {
       if (!res.ok) await alertEngineError(alert, t, res.error)
@@ -462,15 +460,17 @@ export function ContainersView() {
         const idx = ctxMenuIndexRef.current
         const row = containers.find((c) => c.Id === id)
         const strictRunning = isStrictRunning(row ?? null)
-        if (idx === 1 && !strictRunning) return
-        if (idx === 5 && !strictRunning) return
+        if (idx === 0 && !strictRunning) return
+        if (idx === 2 && !strictRunning) return
+        if (idx === 6 && !strictRunning) return
         setCtxMenu(null)
-        if (idx === 0) openLogsWindow(id)
-        else if (idx === 1) openFilesWindow(id)
-        else if (idx === 2) setRuntimeConfigContainerId(id)
-        else if (idx === 3) setRecreateConfigContainerId(id)
-        else if (idx === 4) void openInspect(id)
-        else if (idx === 5) void openStats(id)
+        if (idx === 0) openExecWindow(id)
+        else if (idx === 1) openLogsWindow(id)
+        else if (idx === 2) openFilesWindow(id)
+        else if (idx === 3) setRuntimeConfigContainerId(id)
+        else if (idx === 4) setRecreateConfigContainerId(id)
+        else if (idx === 5) void openInspect(id)
+        else if (idx === 6) void openStats(id)
       }
     }
     const raf = requestAnimationFrame(() => {
@@ -483,7 +483,7 @@ export function ContainersView() {
       if (attached) document.removeEventListener('pointerdown', onPointer, true)
       window.removeEventListener('keydown', onKey, true)
     }
-  }, [ctxMenu, containers, openFilesWindow, openInspect, openLogsWindow, openStats])
+  }, [ctxMenu, containers, openExecWindow, openFilesWindow, openInspect, openLogsWindow, openStats])
 
   const exportTar = async (id: string) => {
     if (!(await confirm(t('containers.exportTarConfirm')))) return
@@ -575,50 +575,9 @@ export function ContainersView() {
     }
   }
 
-  const onExec = async () => {
-    if (!sel) return
-    if (!isStrictRunning(sel)) return
-    const cmd = execCmd.trim()
-    if (!cmd) return
-    pushExecHistory(cmd)
-    setExecBusy(true)
-    setExecOut('')
-    const ts = Number(execTimeoutSec.trim())
-    const timeoutSec = Number.isFinite(ts) && ts > 0 ? Math.min(600, Math.floor(ts)) : 0
-    try {
-      const res = await window.dockerDesktop.execOnce({
-        containerId: sel.Id,
-        command: cmd,
-        timeoutSec: timeoutSec || undefined,
-      })
-      if (!res.ok) throw new Error(res.error)
-      const exit = res.data.exitCode
-      setExecOut(
-        (res.data.output || '') + (typeof exit === 'number' ? `\n\n[exit ${exit}]` : ''),
-      )
-      setExecHistoryList(loadExecHistory())
-    } catch (e) {
-      setExecOut(e instanceof Error ? e.message : String(e))
-    } finally {
-      setExecBusy(false)
-    }
-  }
-
-  const onExecCancel = () => {
-    void window.dockerDesktop.execCancelCurrent()
-  }
-
-  const copyExecOut = async () => {
-    try {
-      await navigator.clipboard.writeText(execOut)
-    } catch {
-      await alert(t('containers.copyIdFailed'))
-    }
-  }
-
   const visibleCols = ALL_CONTAINER_COLS.filter((c) => colVis[c])
-  /** 首列复选框 + 次列展开；数据列固定 px 便于拖拽调宽 */
-  const gridTemplate = `28px 22px ${visibleCols.map((id) => `${colWidths[id]}px`).join(' ')} 2rem`
+  /** 首列复选框 + 次列展开；数据列用 fr 按 colWidths 比例分配宽度，总宽始终贴满容器，避免横向滚动条 */
+  const gridTemplate = `28px 22px ${visibleCols.map((id) => `minmax(0, ${colWidths[id]}fr)`).join(' ')} 2rem`
 
   /** 仅改变 `id` 对应列的 `colWidths[id]`，其它列宽度不变（在 window 上跟指针，避免表头/sticky 丢事件） */
   const startColResize = useCallback((id: ContainerTableColId, e: ReactPointerEvent<HTMLDivElement>) => {
@@ -795,7 +754,7 @@ export function ContainersView() {
           setSelectedContainerId(c.Id)
           setCtxMenu({ x: e.clientX, y: e.clientY, containerId: c.Id })
         }}
-        className={`grid cursor-pointer items-center border-b border-zinc-100 text-[11px] hover:bg-sky-500/5 dark:border-zinc-800/80 dark:hover:bg-sky-500/10 ${
+        className={`grid w-full min-w-0 cursor-pointer items-center border-b border-zinc-100 text-[11px] hover:bg-sky-500/5 dark:border-zinc-800/80 dark:hover:bg-sky-500/10 ${
           active ? 'bg-sky-500/10 dark:bg-sky-500/15' : ''
         }`}
         style={{ gridTemplateColumns: gridTemplate }}
@@ -816,7 +775,7 @@ export function ContainersView() {
   }
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden p-4">
+    <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-3 overflow-hidden p-4">
       <ContainerInspectModal
         open={inspectModal.open}
         title={t('containers.inspect')}
@@ -856,11 +815,10 @@ export function ContainersView() {
             type="button"
             disabled={busy}
             onClick={() => setShowCreate(true)}
-            className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-emerald-600 text-base font-semibold leading-none text-white hover:bg-emerald-500 disabled:opacity-40"
+            className="shrink-0 rounded-md border border-emerald-600 bg-emerald-600 px-2 py-0.5 text-[11px] font-medium text-white hover:bg-emerald-500 disabled:opacity-40 dark:border-emerald-500"
             title={t('containers.createRun')}
-            aria-label={t('containers.createRun')}
           >
-            +
+            {t('containers.addContainer')}
           </button>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -965,10 +923,10 @@ export function ContainersView() {
 
       <div
         ref={scrollRef}
-        className="min-h-0 flex-1 overflow-auto rounded-lg border border-zinc-200/80 dark:border-white/[0.06]"
+        className="min-h-0 min-w-0 w-full flex-1 overflow-x-hidden overflow-y-auto rounded-lg border border-zinc-200/80 dark:border-white/[0.06]"
       >
         <div
-          className="sticky top-0 z-20 grid border-b border-zinc-200 bg-zinc-100/95 text-zinc-600 backdrop-blur dark:border-zinc-800 dark:bg-zinc-900/95 dark:text-zinc-400"
+          className="sticky top-0 z-20 grid w-full min-w-0 border-b border-zinc-200 bg-zinc-100/95 text-zinc-600 backdrop-blur dark:border-zinc-800 dark:bg-zinc-900/95 dark:text-zinc-400"
           style={{ gridTemplateColumns: gridTemplate }}
         >
           <div
@@ -1035,7 +993,7 @@ export function ContainersView() {
           </div>
         </div>
         <div
-          className="relative"
+          className="relative w-full min-w-0"
           style={{
             height: `${virtualizer.getTotalSize()}px`,
           }}
@@ -1193,69 +1151,6 @@ export function ContainersView() {
               </div>
             </div>
           ) : null}
-          <h3 className="mb-1 text-[11px] font-semibold text-zinc-800 dark:text-zinc-200">
-            {t('containers.execTitle')}
-          </h3>
-          {!isStrictRunning(sel) ? (
-            <p className="mb-2 text-[10px] text-amber-800/90 dark:text-amber-200/90">{t('containers.hintNeedsRunning')}</p>
-          ) : null}
-          <div className="flex flex-wrap items-end gap-2">
-            <div className="flex min-w-[200px] flex-1 flex-col gap-1">
-              <textarea
-                value={execCmd}
-                onChange={(e) => setExecCmd(e.target.value)}
-                rows={2}
-                className="w-full rounded-md border border-zinc-300 bg-white px-2 py-1.5 font-mono text-[11px] dark:border-zinc-600 dark:bg-zinc-950"
-                placeholder="ls -la"
-                {...({ list: 'exec-cmd-history' } as TextareaHTMLAttributes<HTMLTextAreaElement>)}
-              />
-              <datalist id="exec-cmd-history">
-                {execHistoryList.map((h) => (
-                  <option key={h} value={h} />
-                ))}
-              </datalist>
-            </div>
-            <label className="flex flex-col gap-0.5 text-[10px] text-zinc-500">
-              <span>{t('containers.execTimeout')}</span>
-              <input
-                value={execTimeoutSec}
-                onChange={(e) => setExecTimeoutSec(e.target.value)}
-                className="w-16 rounded border border-zinc-300 bg-white px-1 py-1 font-mono dark:border-zinc-600 dark:bg-zinc-950"
-                inputMode="numeric"
-              />
-            </label>
-            <button
-              type="button"
-              disabled={execBusy || !execCmd.trim() || !isStrictRunning(sel)}
-              title={sel && !isStrictRunning(sel) ? t('containers.hintNeedsRunning') : undefined}
-              onClick={() => void onExec()}
-              className={`rounded-md bg-sky-600 px-2.5 py-1.5 text-[11px] font-semibold text-white hover:bg-sky-500 ${BTN_DISABLED}`}
-            >
-              {execBusy ? t('common.loading') : t('containers.execRun')}
-            </button>
-            <button
-              type="button"
-              disabled={!execBusy}
-              onClick={() => onExecCancel()}
-              className={`rounded-md border border-zinc-300 px-2 py-1.5 text-[11px] hover:bg-zinc-50 dark:border-zinc-600 dark:bg-zinc-900 dark:hover:bg-zinc-800 ${BTN_DISABLED}`}
-            >
-              {t('containers.execCancel')}
-            </button>
-            <button
-              type="button"
-              disabled={!execOut}
-              onClick={() => void copyExecOut()}
-              className={`rounded-md border border-zinc-300 px-2 py-1.5 text-[11px] hover:bg-zinc-50 dark:border-zinc-600 dark:bg-zinc-900 dark:hover:bg-zinc-800 ${BTN_DISABLED}`}
-            >
-              {t('containers.execCopy')}
-            </button>
-          </div>
-          {execOut ? (
-            <pre className="mt-2 max-h-40 overflow-auto rounded border border-zinc-200 bg-zinc-50 p-2 font-mono text-[10px] dark:border-zinc-700 dark:bg-black/30">
-              {execOut}
-            </pre>
-          ) : null}
-          <p className="mt-2 text-[10px] leading-snug text-zinc-500 dark:text-zinc-400">{t('containers.execHint')}</p>
         </div>
       ) : null}
 
@@ -1270,10 +1165,28 @@ export function ContainersView() {
           <button
             type="button"
             role="menuitem"
-            className={`block w-full px-3 py-2 text-left enabled:hover:bg-zinc-100 dark:enabled:hover:bg-zinc-800 ${ctxMenuIndex === 0 ? 'bg-zinc-100 dark:bg-zinc-800' : ''}`}
+            disabled={!ctxMenuStrictRunning}
+            title={!ctxMenuStrictRunning ? t('containers.hintNeedsRunning') : undefined}
+            className={`block w-full px-3 py-2 text-left enabled:hover:bg-zinc-100 dark:enabled:hover:bg-zinc-800 ${ctxMenuIndex === 0 ? 'bg-zinc-100 dark:bg-zinc-800' : ''} ${BTN_DISABLED}`}
             onMouseEnter={() => {
               ctxMenuIndexRef.current = 0
               setCtxMenuIndex(0)
+            }}
+            onClick={() => {
+              if (!ctxMenuStrictRunning) return
+              openExecWindow(ctxMenu.containerId)
+              setCtxMenu(null)
+            }}
+          >
+            {t('containers.contextExec')}
+          </button>
+          <button
+            type="button"
+            role="menuitem"
+            className={`block w-full px-3 py-2 text-left enabled:hover:bg-zinc-100 dark:enabled:hover:bg-zinc-800 ${ctxMenuIndex === 1 ? 'bg-zinc-100 dark:bg-zinc-800' : ''}`}
+            onMouseEnter={() => {
+              ctxMenuIndexRef.current = 1
+              setCtxMenuIndex(1)
             }}
             onClick={() => {
               openLogsWindow(ctxMenu.containerId)
@@ -1287,10 +1200,10 @@ export function ContainersView() {
             role="menuitem"
             disabled={!ctxMenuStrictRunning}
             title={!ctxMenuStrictRunning ? t('containers.hintNeedsRunning') : undefined}
-            className={`block w-full px-3 py-2 text-left enabled:hover:bg-zinc-100 dark:enabled:hover:bg-zinc-800 ${ctxMenuIndex === 1 ? 'bg-zinc-100 dark:bg-zinc-800' : ''} ${BTN_DISABLED}`}
+            className={`block w-full px-3 py-2 text-left enabled:hover:bg-zinc-100 dark:enabled:hover:bg-zinc-800 ${ctxMenuIndex === 2 ? 'bg-zinc-100 dark:bg-zinc-800' : ''} ${BTN_DISABLED}`}
             onMouseEnter={() => {
-              ctxMenuIndexRef.current = 1
-              setCtxMenuIndex(1)
+              ctxMenuIndexRef.current = 2
+              setCtxMenuIndex(2)
             }}
             onClick={() => {
               if (!ctxMenuStrictRunning) return
@@ -1304,10 +1217,10 @@ export function ContainersView() {
             type="button"
             role="menuitem"
             title={t('containers.contextConfigInPlaceHint')}
-            className={`block w-full px-3 py-2 text-left enabled:hover:bg-zinc-100 dark:enabled:hover:bg-zinc-800 ${ctxMenuIndex === 2 ? 'bg-zinc-100 dark:bg-zinc-800' : ''}`}
+            className={`block w-full px-3 py-2 text-left enabled:hover:bg-zinc-100 dark:enabled:hover:bg-zinc-800 ${ctxMenuIndex === 3 ? 'bg-zinc-100 dark:bg-zinc-800' : ''}`}
             onMouseEnter={() => {
-              ctxMenuIndexRef.current = 2
-              setCtxMenuIndex(2)
+              ctxMenuIndexRef.current = 3
+              setCtxMenuIndex(3)
             }}
             onClick={() => {
               setRuntimeConfigContainerId(ctxMenu.containerId)
@@ -1320,10 +1233,10 @@ export function ContainersView() {
             type="button"
             role="menuitem"
             title={t('containers.contextConfigRecreateHint')}
-            className={`block w-full px-3 py-2 text-left enabled:hover:bg-zinc-100 dark:enabled:hover:bg-zinc-800 ${ctxMenuIndex === 3 ? 'bg-zinc-100 dark:bg-zinc-800' : ''}`}
+            className={`block w-full px-3 py-2 text-left enabled:hover:bg-zinc-100 dark:enabled:hover:bg-zinc-800 ${ctxMenuIndex === 4 ? 'bg-zinc-100 dark:bg-zinc-800' : ''}`}
             onMouseEnter={() => {
-              ctxMenuIndexRef.current = 3
-              setCtxMenuIndex(3)
+              ctxMenuIndexRef.current = 4
+              setCtxMenuIndex(4)
             }}
             onClick={() => {
               setRecreateConfigContainerId(ctxMenu.containerId)
@@ -1335,10 +1248,10 @@ export function ContainersView() {
           <button
             type="button"
             role="menuitem"
-            className={`block w-full px-3 py-2 text-left enabled:hover:bg-zinc-100 dark:enabled:hover:bg-zinc-800 ${ctxMenuIndex === 4 ? 'bg-zinc-100 dark:bg-zinc-800' : ''}`}
+            className={`block w-full px-3 py-2 text-left enabled:hover:bg-zinc-100 dark:enabled:hover:bg-zinc-800 ${ctxMenuIndex === 5 ? 'bg-zinc-100 dark:bg-zinc-800' : ''}`}
             onMouseEnter={() => {
-              ctxMenuIndexRef.current = 4
-              setCtxMenuIndex(4)
+              ctxMenuIndexRef.current = 5
+              setCtxMenuIndex(5)
             }}
             onClick={() => {
               void openInspect(ctxMenu.containerId)
@@ -1352,10 +1265,10 @@ export function ContainersView() {
             role="menuitem"
             disabled={!ctxMenuStrictRunning}
             title={!ctxMenuStrictRunning ? t('containers.hintNeedsRunning') : undefined}
-            className={`block w-full px-3 py-2 text-left enabled:hover:bg-zinc-100 dark:enabled:hover:bg-zinc-800 ${ctxMenuIndex === 5 ? 'bg-zinc-100 dark:bg-zinc-800' : ''} ${BTN_DISABLED}`}
+            className={`block w-full px-3 py-2 text-left enabled:hover:bg-zinc-100 dark:enabled:hover:bg-zinc-800 ${ctxMenuIndex === 6 ? 'bg-zinc-100 dark:bg-zinc-800' : ''} ${BTN_DISABLED}`}
             onMouseEnter={() => {
-              ctxMenuIndexRef.current = 5
-              setCtxMenuIndex(5)
+              ctxMenuIndexRef.current = 6
+              setCtxMenuIndex(6)
             }}
             onClick={() => {
               if (!ctxMenuStrictRunning) return

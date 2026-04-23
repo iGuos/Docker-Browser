@@ -3,6 +3,7 @@
   "appId": "com.guos.dockerbrowser",
   "productName": "Docker Browser",
   "asar": true,
+  "asarUnpack": ["**/node_modules/node-pty/**/*"],
   "directories": {
     "output": "release/${version}",
     "buildResources": "public"

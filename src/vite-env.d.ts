@@ -5,6 +5,7 @@ import type { RunningContainersMemorySummary } from '../shared/dockerMemorySumma
 import type { AppUpdateStatus } from '../shared/appUpdateStatus'
 import type { DockerEventChunk } from '../shared/dockerEvents'
 import type { DockerLogsChunk } from '../shared/dockerLogs'
+import type { DockerExecPtyData, DockerExecPtyExit } from '../shared/dockerExecPty'
 import type { IpcResult } from '../shared/ipc'
 import type { AppLanguage } from '../shared/locale'
 import type { ThemePreference } from '../shared/theme'
@@ -36,6 +37,17 @@ export interface DockerDesktopApi {
     autoRemove?: boolean
     restartPolicy?: string
   }): Promise<IpcResult<{ id: string }>>
+  createAndRestartFromDockerRunCli(line: string, onProgress?: (text: string) => void): Promise<IpcResult<void>>
+  buildAndRunFromDockerfile(payload: {
+    dockerfile: string
+    imageTag: string
+    onProgress?: (text: string) => void
+  }): Promise<IpcResult<void>>
+  composeUpFromYaml(payload: {
+    composeYaml: string
+    projectName?: string
+    onProgress?: (text: string) => void
+  }): Promise<IpcResult<void>>
   recreateContainer(payload: {
     containerId: string
     image: string
@@ -61,6 +73,16 @@ export interface DockerDesktopApi {
     timeoutSec?: number
   }): Promise<IpcResult<{ output: string; exitCode?: number }>>
   execCancelCurrent(): Promise<IpcResult<void>>
+  execPtyStart(payload: {
+    containerId: string
+    cols?: number
+    rows?: number
+  }): Promise<IpcResult<{ subscriptionId: string }>>
+  execPtyStop(subscriptionId: string): Promise<IpcResult<void>>
+  execPtyWrite(payload: { subscriptionId: string; data: string }): Promise<IpcResult<void>>
+  execPtyResize(payload: { subscriptionId: string; cols: number; rows: number }): Promise<IpcResult<void>>
+  onExecPtyData(handler: (msg: DockerExecPtyData) => void): () => void
+  onExecPtyExit(handler: (msg: DockerExecPtyExit) => void): () => void
   startEvents(opts?: { sinceUnix?: number }): Promise<IpcResult<{ subscriptionId: string }>>
   stopEvents(subscriptionId: string): Promise<IpcResult<void>>
   listNetworks(): Promise<IpcResult<unknown[]>>
@@ -72,6 +94,7 @@ export interface DockerDesktopApi {
   >
   stopLogs(subscriptionId: string): Promise<IpcResult<void>>
   openContainerLogsWindow(containerId: string): Promise<IpcResult<void>>
+  openContainerExecWindow(containerId: string): Promise<IpcResult<void>>
   openContainerFilesWindow(containerId: string, initialPath?: string): Promise<IpcResult<void>>
   containerFsList(payload: {
     containerId: string

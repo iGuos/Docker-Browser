@@ -4,6 +4,7 @@ import type { ThemePreference } from '../../shared/theme'
 import type { IpcResult } from '../../shared/ipc'
 import type { DockerLogsChunk } from '../../shared/dockerLogs'
 import type { DockerEventChunk } from '../../shared/dockerEvents'
+import type { DockerExecPtyData, DockerExecPtyExit } from '../../shared/dockerExecPty'
 import { AppIpc } from '../../shared/appIpcChannels'
 import type { HostMetrics } from '../../shared/hostMetrics'
 import type { RunningContainersMemorySummary } from '../../shared/dockerMemorySummary'
@@ -74,6 +75,66 @@ contextBridge.exposeInMainWorld('dockerDesktop', {
   }): Promise<IpcResult<{ id: string }>> {
     return ipcRenderer.invoke(DockerIpc.createRunContainer, payload)
   },
+  createAndRestartFromDockerRunCli(
+    line: string,
+    onProgress?: (text: string) => void,
+  ): Promise<IpcResult<void>> {
+    const requestId = onProgress ? globalThis.crypto.randomUUID() : ''
+    const wrap = onProgress
+      ? (_e: Electron.IpcRendererEvent, msg: unknown) => {
+          const m = msg as { requestId?: string; text?: string }
+          if (m?.requestId === requestId && typeof m.text === 'string') onProgress(m.text)
+        }
+      : null
+    if (wrap) ipcRenderer.on(DockerIpc.dockerCliProgress, wrap)
+    const invokePayload = requestId ? { line, requestId } : line
+    const p = ipcRenderer.invoke(DockerIpc.createAndRestartFromDockerRunCli, invokePayload) as Promise<
+      IpcResult<void>
+    >
+    return p.finally(() => {
+      if (wrap) ipcRenderer.removeListener(DockerIpc.dockerCliProgress, wrap)
+    })
+  },
+  buildAndRunFromDockerfile(payload: {
+    dockerfile: string
+    imageTag: string
+    onProgress?: (text: string) => void
+  }): Promise<IpcResult<void>> {
+    const { onProgress, ...rest } = payload
+    const requestId = onProgress ? globalThis.crypto.randomUUID() : ''
+    const wrap = onProgress
+      ? (_e: Electron.IpcRendererEvent, msg: unknown) => {
+          const m = msg as { requestId?: string; text?: string }
+          if (m?.requestId === requestId && typeof m.text === 'string') onProgress(m.text)
+        }
+      : null
+    if (wrap) ipcRenderer.on(DockerIpc.dockerCliProgress, wrap)
+    const invokePayload = requestId ? { ...rest, requestId } : rest
+    const p = ipcRenderer.invoke(DockerIpc.buildAndRunFromDockerfile, invokePayload) as Promise<IpcResult<void>>
+    return p.finally(() => {
+      if (wrap) ipcRenderer.removeListener(DockerIpc.dockerCliProgress, wrap)
+    })
+  },
+  composeUpFromYaml(payload: {
+    composeYaml: string
+    projectName?: string
+    onProgress?: (text: string) => void
+  }): Promise<IpcResult<void>> {
+    const { onProgress, ...rest } = payload
+    const requestId = onProgress ? globalThis.crypto.randomUUID() : ''
+    const wrap = onProgress
+      ? (_e: Electron.IpcRendererEvent, msg: unknown) => {
+          const m = msg as { requestId?: string; text?: string }
+          if (m?.requestId === requestId && typeof m.text === 'string') onProgress(m.text)
+        }
+      : null
+    if (wrap) ipcRenderer.on(DockerIpc.dockerCliProgress, wrap)
+    const invokePayload = requestId ? { ...rest, requestId } : rest
+    const p = ipcRenderer.invoke(DockerIpc.composeUpFromYaml, invokePayload) as Promise<IpcResult<void>>
+    return p.finally(() => {
+      if (wrap) ipcRenderer.removeListener(DockerIpc.dockerCliProgress, wrap)
+    })
+  },
   recreateContainer(payload: {
     containerId: string
     image: string
@@ -109,6 +170,38 @@ contextBridge.exposeInMainWorld('dockerDesktop', {
   execCancelCurrent(): Promise<IpcResult<void>> {
     return ipcRenderer.invoke(DockerIpc.execCancelCurrent)
   },
+  execPtyStart(payload: {
+    containerId: string
+    cols?: number
+    rows?: number
+  }): Promise<IpcResult<{ subscriptionId: string }>> {
+    return ipcRenderer.invoke(DockerIpc.execPtyStart, payload)
+  },
+  execPtyStop(subscriptionId: string): Promise<IpcResult<void>> {
+    return ipcRenderer.invoke(DockerIpc.execPtyStop, subscriptionId)
+  },
+  execPtyWrite(payload: { subscriptionId: string; data: string }): Promise<IpcResult<void>> {
+    return ipcRenderer.invoke(DockerIpc.execPtyWrite, payload)
+  },
+  execPtyResize(payload: { subscriptionId: string; cols: number; rows: number }): Promise<IpcResult<void>> {
+    return ipcRenderer.invoke(DockerIpc.execPtyResize, payload)
+  },
+  onExecPtyData(handler: (msg: DockerExecPtyData) => void): () => void {
+    const wrap = (_e: Electron.IpcRendererEvent, msg: unknown) => {
+      const m = msg as DockerExecPtyData
+      if (m && typeof m.subscriptionId === 'string' && typeof m.data === 'string') handler(m)
+    }
+    ipcRenderer.on(DockerIpc.execPtyData, wrap)
+    return () => ipcRenderer.removeListener(DockerIpc.execPtyData, wrap)
+  },
+  onExecPtyExit(handler: (msg: DockerExecPtyExit) => void): () => void {
+    const wrap = (_e: Electron.IpcRendererEvent, msg: unknown) => {
+      const m = msg as DockerExecPtyExit
+      if (m && typeof m.subscriptionId === 'string') handler(m)
+    }
+    ipcRenderer.on(DockerIpc.execPtyExit, wrap)
+    return () => ipcRenderer.removeListener(DockerIpc.execPtyExit, wrap)
+  },
   startEvents(opts?: { sinceUnix?: number }): Promise<IpcResult<{ subscriptionId: string }>> {
     return ipcRenderer.invoke(DockerIpc.eventsStart, opts)
   },
@@ -137,6 +230,9 @@ contextBridge.exposeInMainWorld('dockerDesktop', {
   },
   openContainerLogsWindow(containerId: string): Promise<IpcResult<void>> {
     return ipcRenderer.invoke('app:open-container-logs-window', containerId)
+  },
+  openContainerExecWindow(containerId: string): Promise<IpcResult<void>> {
+    return ipcRenderer.invoke('app:open-container-exec-window', containerId)
   },
   openContainerFilesWindow(containerId: string, initialPath?: string): Promise<IpcResult<void>> {
     return ipcRenderer.invoke('app:open-container-files-window', { containerId, initialPath })

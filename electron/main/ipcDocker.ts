@@ -9,13 +9,20 @@ import type { Readable } from 'node:stream'
 import type { ContainerCreateOptions, HostConfig } from 'dockerode'
 import type { DockerLogsChunk } from '../../shared/dockerLogs'
 import { DockerIpc } from '../../shared/dockerIpcChannels'
+import type { DockerCliProgressPayload } from '../../shared/dockerCliProgress'
 import type { RunningContainersMemorySummary } from '../../shared/dockerMemorySummary'
 import { ipcErr, ipcOk, type IpcResult } from '../../shared/ipc'
 import { getDocker, resetDockerClient } from './dockerClient'
 import { demuxDockerLogStream } from './dockerLogDemux'
 import { normalizeRestartPolicyName, restartPolicyToDocker } from '../../shared/restartPolicy'
+import {
+  buildAndRunFromDockerfile,
+  composeUpFromYaml,
+  createAndRestartFromDockerRunCli,
+} from './dockerCliCreate'
 import { parseEnvLines, parsePortPublish } from './dockerCreateHelpers'
 import { buildRecreateCreateOptions } from './dockerRecreateHelpers'
+import { killAllDockerPtySessions, registerDockerExecPtyIpc } from './dockerExecPty'
 import {
   CONTAINER_FS_MAX_READ_BYTES,
   containerExecArgv,
@@ -108,8 +115,16 @@ function ipcDlg() {
 export function registerDockerIpc(): void {
   if (registered) return
   registered = true
+  registerDockerExecPtyIpc()
 
   app.on('before-quit', () => {
+    try {
+      execStreamCleanup?.()
+    } catch {
+      /* ignore */
+    }
+    execStreamCleanup = null
+    killAllDockerPtySessions()
     for (const sub of logSubs.values()) sub.destroy()
     logSubs.clear()
     for (const sub of eventSubs.values()) sub.destroy()
@@ -510,6 +525,93 @@ export function registerDockerIpc(): void {
   )
 
   ipcMain.handle(
+    DockerIpc.createAndRestartFromDockerRunCli,
+    async (evt, payload: unknown): Promise<IpcResult<void>> => {
+      const line =
+        typeof payload === 'string'
+          ? payload
+          : typeof (payload as { line?: unknown })?.line === 'string'
+            ? (payload as { line: string }).line
+            : ''
+      const requestId =
+        typeof payload === 'object' &&
+        payload !== null &&
+        typeof (payload as { requestId?: unknown }).requestId === 'string'
+          ? (payload as { requestId: string }).requestId
+          : ''
+      if (!line.trim()) return ipcErr('Command is empty.')
+      const send =
+        requestId && !evt.sender.isDestroyed()
+          ? (text: string) => {
+              if (evt.sender.isDestroyed()) return
+              evt.sender.send(DockerIpc.dockerCliProgress, {
+                requestId,
+                text,
+              } satisfies DockerCliProgressPayload)
+            }
+          : undefined
+      try {
+        await createAndRestartFromDockerRunCli(line, send)
+        return ipcOk(undefined)
+      } catch (e) {
+        return ipcErr(e instanceof Error ? e.message : String(e))
+      }
+    },
+  )
+
+  ipcMain.handle(
+    DockerIpc.buildAndRunFromDockerfile,
+    async (evt, payload: unknown): Promise<IpcResult<void>> => {
+      const p = payload as { dockerfile?: string; imageTag?: string; requestId?: string }
+      const dockerfile = typeof p.dockerfile === 'string' ? p.dockerfile : ''
+      const imageTag = typeof p.imageTag === 'string' ? p.imageTag : ''
+      const requestId = typeof p.requestId === 'string' ? p.requestId : ''
+      const send =
+        requestId && !evt.sender.isDestroyed()
+          ? (text: string) => {
+              if (evt.sender.isDestroyed()) return
+              evt.sender.send(DockerIpc.dockerCliProgress, {
+                requestId,
+                text,
+              } satisfies DockerCliProgressPayload)
+            }
+          : undefined
+      try {
+        await buildAndRunFromDockerfile(dockerfile, imageTag, send)
+        return ipcOk(undefined)
+      } catch (e) {
+        return ipcErr(e instanceof Error ? e.message : String(e))
+      }
+    },
+  )
+
+  ipcMain.handle(
+    DockerIpc.composeUpFromYaml,
+    async (evt, payload: unknown): Promise<IpcResult<void>> => {
+      const p = payload as { composeYaml?: string; projectName?: string; requestId?: string }
+      const composeYaml = typeof p.composeYaml === 'string' ? p.composeYaml : ''
+      const projectName = typeof p.projectName === 'string' ? p.projectName : ''
+      const requestId = typeof p.requestId === 'string' ? p.requestId : ''
+      const send =
+        requestId && !evt.sender.isDestroyed()
+          ? (text: string) => {
+              if (evt.sender.isDestroyed()) return
+              evt.sender.send(DockerIpc.dockerCliProgress, {
+                requestId,
+                text,
+              } satisfies DockerCliProgressPayload)
+            }
+          : undefined
+      try {
+        await composeUpFromYaml(composeYaml, projectName || undefined, send)
+        return ipcOk(undefined)
+      } catch (e) {
+        return ipcErr(e instanceof Error ? e.message : String(e))
+      }
+    },
+  )
+
+  ipcMain.handle(
     'docker:recreate-container',
     async (_evt, payload: unknown): Promise<IpcResult<{ id: string }>> => {
       const p = payload as {
@@ -663,6 +765,7 @@ export function registerDockerIpc(): void {
         /* ignore */
       }
       execStreamCleanup = null
+      killAllDockerPtySessions()
       return ipcOk(undefined)
     },
   )

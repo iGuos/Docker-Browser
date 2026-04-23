@@ -187,6 +187,46 @@ ipcMain.handle('app:open-container-logs-window', (_evt, containerId: unknown) =>
   }
 })
 
+function createExecWindow(containerId: string) {
+  const execWin = new BrowserWindow({
+    title: 'Docker Browser',
+    width: 920,
+    height: 640,
+    minWidth: 400,
+    minHeight: 280,
+    autoHideMenuBar: true,
+    icon: path.join(process.env.VITE_PUBLIC ?? '', 'icon.png'),
+    webPreferences: {
+      preload,
+      nodeIntegration: false,
+      contextIsolation: true,
+    },
+  })
+  execWin.setMenu(null)
+
+  const hash = `exec?containerId=${encodeURIComponent(containerId)}`
+  if (VITE_DEV_SERVER_URL) {
+    void execWin.loadURL(`${VITE_DEV_SERVER_URL}#${hash}`)
+  } else {
+    void execWin.loadFile(indexHtml, { hash })
+  }
+
+  execWin.webContents.setWindowOpenHandler(({ url }) => {
+    void openExternalUrlIfAllowed(url)
+    return { action: 'deny' }
+  })
+}
+
+ipcMain.handle('app:open-container-exec-window', (_evt, containerId: unknown) => {
+  if (typeof containerId !== 'string' || !containerId.trim()) return Promise.resolve(ipcErr('invalid container id'))
+  try {
+    createExecWindow(containerId.trim())
+    return Promise.resolve(ipcOk(undefined))
+  } catch (e) {
+    return Promise.resolve(ipcErr(e instanceof Error ? e.message : String(e)))
+  }
+})
+
 function createFilesWindow(containerId: string, initialPath = '/') {
   const w = new BrowserWindow({
     title: 'Docker Browser',

@@ -15,3 +15,6 @@ Desktop.ini
 
 *.tsbuildinfo
 .eslintcache
+
+# Electron 主进程 docker run 默认工作目录（见 electron/main/dockerCliCreate.ts）
+docker-browser/
