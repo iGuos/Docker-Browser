@@ -195,20 +195,30 @@ export function ImagesView() {
         jsonText={historyText}
         onClose={() => setHistoryOpen(false)}
       />
-      <div className="flex shrink-0 flex-wrap items-center justify-between gap-2">
-        <h2 className="text-sm font-semibold">{t('images.title')}</h2>
+      <div className="flex shrink-0 flex-col gap-2">
+        <div>
+          <h2 className="text-sm font-semibold">{t('images.title')}</h2>
+          <p className="mt-0.5 text-[10px] leading-snug text-zinc-500 dark:text-zinc-400">{t('images.selectionHint')}</p>
+        </div>
         <div className="flex flex-wrap items-center gap-2">
           <input
             value={pullTag}
             onChange={(e) => setPullTag(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key !== 'Enter') return
+              if (busy || pulling || !pullTag.trim()) return
+              e.preventDefault()
+              onPull()
+            }}
             placeholder={t('images.pullPlaceholder')}
+            aria-label={t('images.pullInputAria')}
             className="w-48 rounded-md border border-zinc-300 bg-white px-2 py-1 text-[11px] dark:border-zinc-600 dark:bg-zinc-900"
           />
           <button
             type="button"
-            disabled={busy || pulling}
+            disabled={busy || pulling || !pullTag.trim()}
             onClick={onPull}
-            className="rounded-md bg-sky-600 px-2 py-1 text-[11px] font-semibold text-white hover:bg-sky-500 disabled:opacity-40"
+            className="rounded-md bg-sky-600 px-2 py-1 text-[11px] font-semibold text-white hover:bg-sky-500 disabled:pointer-events-none disabled:opacity-40"
           >
             {pulling ? t('images.pulling') : t('images.pull')}
           </button>
@@ -216,7 +226,7 @@ export function ImagesView() {
             type="button"
             disabled={checkedIds.size === 0 || busy}
             onClick={() => void onRemoveSelected()}
-            className="rounded-md border border-rose-400 px-2 py-1 text-[11px] text-rose-800 dark:border-rose-800 dark:text-rose-200"
+            className="rounded-md border border-rose-400 px-2 py-1 text-[11px] text-rose-800 hover:bg-rose-50 disabled:pointer-events-none disabled:opacity-40 dark:border-rose-800 dark:text-rose-200 dark:hover:bg-rose-950/30"
           >
             {t('images.removeSelected')}
           </button>
@@ -224,13 +234,12 @@ export function ImagesView() {
             type="button"
             disabled={busy}
             onClick={() => void onLoadTar()}
-            className="rounded-md border border-zinc-300 px-2 py-1 text-[11px] dark:border-zinc-600"
+            className="rounded-md border border-zinc-300 bg-white px-2 py-1 text-[11px] hover:bg-zinc-50 disabled:pointer-events-none disabled:opacity-40 dark:border-zinc-600 dark:bg-zinc-900 dark:hover:bg-zinc-800"
           >
             {t('images.loadTar')}
           </button>
         </div>
       </div>
-      <p className="shrink-0 text-[10px] leading-snug text-zinc-500 dark:text-zinc-400">{t('images.selectionHint')}</p>
       {sel && imageNameForApi ? (
         <div className="flex min-w-0 shrink-0 flex-nowrap items-center gap-x-2 gap-y-1 overflow-x-auto rounded-lg border border-zinc-200/70 bg-zinc-50/80 px-2 py-1.5 text-[11px] dark:border-white/[0.06] dark:bg-zinc-900/50">
           <span className="shrink-0 whitespace-nowrap text-zinc-500">{t('images.tagSource')}</span>
@@ -244,19 +253,21 @@ export function ImagesView() {
           <input
             value={tagRepo}
             onChange={(e) => setTagRepo(e.target.value)}
-            className="w-36 shrink-0 rounded border border-zinc-300 bg-white px-2 py-1 font-mono dark:border-zinc-600 dark:bg-zinc-950"
+            aria-label={t('images.tagRepo')}
+            className="w-36 shrink-0 rounded-md border border-zinc-300 bg-white px-2 py-1 font-mono text-[11px] dark:border-zinc-600 dark:bg-zinc-950"
           />
           <span className="shrink-0 whitespace-nowrap text-zinc-500">{t('images.tagLabel')}</span>
           <input
             value={tagTag}
             onChange={(e) => setTagTag(e.target.value)}
-            className="w-24 shrink-0 rounded border border-zinc-300 bg-white px-2 py-1 font-mono dark:border-zinc-600 dark:bg-zinc-950"
+            aria-label={t('images.tagLabel')}
+            className="w-24 shrink-0 rounded-md border border-zinc-300 bg-white px-2 py-1 font-mono text-[11px] dark:border-zinc-600 dark:bg-zinc-950"
           />
           <button
             type="button"
             disabled={busy || tagging || !tagRepo.trim()}
             onClick={onTag}
-            className="shrink-0 rounded-md border border-zinc-400 bg-white px-2 py-1 font-medium dark:border-zinc-500 dark:bg-zinc-800"
+            className="shrink-0 rounded-md border border-zinc-400 bg-white px-2 py-1 font-medium hover:bg-zinc-50 disabled:pointer-events-none disabled:opacity-40 dark:border-zinc-500 dark:bg-zinc-800 dark:hover:bg-zinc-700/80"
           >
             {tagging ? t('common.loading') : t('images.tagAction')}
           </button>
@@ -266,7 +277,7 @@ export function ImagesView() {
               type="button"
               disabled={!imageNameForApi || busy}
               onClick={() => void onHistory()}
-              className="shrink-0 rounded-md border border-zinc-300 px-2 py-1 dark:border-zinc-600"
+              className="shrink-0 rounded-md border border-zinc-300 bg-white px-2 py-1 hover:bg-zinc-50 disabled:pointer-events-none disabled:opacity-40 dark:border-zinc-600 dark:bg-zinc-900 dark:hover:bg-zinc-800"
             >
               {t('images.history')}
             </button>
@@ -274,7 +285,7 @@ export function ImagesView() {
               type="button"
               disabled={!imageNameForApi || busy}
               onClick={() => void onSaveTar()}
-              className="shrink-0 rounded-md border border-zinc-300 px-2 py-1 dark:border-zinc-600"
+              className="shrink-0 rounded-md border border-zinc-300 bg-white px-2 py-1 hover:bg-zinc-50 disabled:pointer-events-none disabled:opacity-40 dark:border-zinc-600 dark:bg-zinc-900 dark:hover:bg-zinc-800"
             >
               {t('images.saveTar')}
             </button>
@@ -290,6 +301,7 @@ export function ImagesView() {
                   ref={headerCheckboxRef}
                   type="checkbox"
                   className="align-middle"
+                  disabled={images.length === 0}
                   checked={allSelected}
                   onChange={toggleSelectAll}
                   title={t('common.selectAll')}
@@ -308,39 +320,50 @@ export function ImagesView() {
             </tr>
           </thead>
           <tbody>
-            {images.map((im) => {
-              const active = im.Id === selectedImageRef
-              const tags = im.RepoTags?.filter(Boolean).join(', ') || `<${shortId(im.Id)}>`
-              const checked = checkedIds.has(im.Id)
-              return (
-                <tr
-                  key={im.Id}
-                  onClick={() => setSelectedImageRef(im.Id)}
-                  className={`cursor-pointer border-b border-zinc-100 hover:bg-sky-500/5 dark:border-zinc-800/80 dark:hover:bg-sky-500/10 ${
-                    active ? 'bg-sky-500/10 dark:bg-sky-500/15' : ''
-                  }`}
+            {images.length === 0 ? (
+              <tr>
+                <td
+                  colSpan={4}
+                  className="px-3 py-10 text-center text-[11px] leading-relaxed text-zinc-500 dark:text-zinc-400"
                 >
-                  <td className="px-1 py-1.5 align-middle" onClick={(e) => e.stopPropagation()}>
-                    <input
-                      type="checkbox"
-                      className="align-middle"
-                      checked={checked}
-                      onChange={(e) => {
-                        e.stopPropagation()
-                        toggleChecked(im.Id, e.target.checked)
-                      }}
-                      onClick={(e) => e.stopPropagation()}
-                      aria-label={tags}
-                    />
-                  </td>
-                  <td className="px-2 py-1.5 align-middle text-zinc-900 dark:text-zinc-100">{tags}</td>
-                  <td className="px-2 py-1.5 align-middle font-mono text-zinc-600 dark:text-zinc-400">
-                    {shortId(im.Id)}
-                  </td>
-                  <td className="px-2 py-1.5 align-middle">{formatBytes(im.Size)}</td>
-                </tr>
-              )
-            })}
+                  {t('images.emptyTable')}
+                </td>
+              </tr>
+            ) : (
+              images.map((im) => {
+                const active = im.Id === selectedImageRef
+                const tags = im.RepoTags?.filter(Boolean).join(', ') || `<${shortId(im.Id)}>`
+                const checked = checkedIds.has(im.Id)
+                return (
+                  <tr
+                    key={im.Id}
+                    onClick={() => setSelectedImageRef(im.Id)}
+                    className={`cursor-pointer border-b border-zinc-100 hover:bg-sky-500/5 dark:border-zinc-800/80 dark:hover:bg-sky-500/10 ${
+                      active ? 'bg-sky-500/10 dark:bg-sky-500/15' : ''
+                    }`}
+                  >
+                    <td className="px-1 py-1.5 align-middle" onClick={(e) => e.stopPropagation()}>
+                      <input
+                        type="checkbox"
+                        className="align-middle"
+                        checked={checked}
+                        onChange={(e) => {
+                          e.stopPropagation()
+                          toggleChecked(im.Id, e.target.checked)
+                        }}
+                        onClick={(e) => e.stopPropagation()}
+                        aria-label={tags}
+                      />
+                    </td>
+                    <td className="px-2 py-1.5 align-middle text-zinc-900 dark:text-zinc-100">{tags}</td>
+                    <td className="px-2 py-1.5 align-middle font-mono text-zinc-600 dark:text-zinc-400">
+                      {shortId(im.Id)}
+                    </td>
+                    <td className="px-2 py-1.5 align-middle">{formatBytes(im.Size)}</td>
+                  </tr>
+                )
+              })
+            )}
           </tbody>
         </table>
       </div>

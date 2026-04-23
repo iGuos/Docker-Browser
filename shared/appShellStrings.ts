@@ -40,6 +40,8 @@ export type AppShellStrings = {
   zoom: string
   bringAllToFront: string
   help: string
+  menuCheckForUpdates: string
+  menuRestartToInstall: string
   dockerEngineDocs: string
   helpOpenSourceRepository: string
   aboutAppMenu: string
@@ -83,6 +85,8 @@ const ZH: AppShellStrings = {
   zoom: '缩放',
   bringAllToFront: '前置全部窗口',
   help: '帮助',
+  menuCheckForUpdates: '检查应用更新…',
+  menuRestartToInstall: '重启并完成更新',
   dockerEngineDocs: 'Docker Engine API 文档',
   helpOpenSourceRepository: '源代码仓库（GitHub）',
   aboutAppMenu: '关于 Docker Browser',
@@ -126,6 +130,8 @@ const EN: AppShellStrings = {
   zoom: 'Zoom',
   bringAllToFront: 'Bring All to Front',
   help: 'Help',
+  menuCheckForUpdates: 'Check for App Updates…',
+  menuRestartToInstall: 'Restart to Install Update',
   dockerEngineDocs: 'Docker Engine API docs',
   helpOpenSourceRepository: 'Source repository (GitHub)',
   aboutAppMenu: 'About Docker Browser',

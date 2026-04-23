@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { useModalEscape } from '@/hooks/useModalEscape'
 import {
   extractInspectLabels,
   extractInspectMounts,
@@ -21,6 +22,8 @@ export function ContainerInspectModal({ open, title, data, onClose }: Props) {
     if (open) setTab('summary')
   }, [open])
 
+  useModalEscape(open, onClose)
+
   const mounts = useMemo(() => (data ? extractInspectMounts(data) : []), [data])
   const nets = useMemo(() => (data ? extractInspectNetworkNames(data) : []), [data])
   const labels = useMemo(() => (data ? extractInspectLabels(data) : []), [data])
@@ -32,8 +35,8 @@ export function ContainerInspectModal({ open, title, data, onClose }: Props) {
     <div
       className="fixed inset-0 z-[115] flex items-center justify-center bg-black/50 p-4"
       role="dialog"
+      aria-modal="true"
       aria-labelledby="container-inspect-title"
-      onClick={onClose}
     >
       <div
         className="flex max-h-[88vh] w-full max-w-3xl flex-col overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-xl dark:border-zinc-700 dark:bg-zinc-900"

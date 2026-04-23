@@ -1,5 +1,7 @@
 import { app, BrowserWindow, ipcMain } from 'electron'
-import { autoUpdater } from 'electron-updater'
+import electronUpdater from 'electron-updater'
+
+const { autoUpdater } = electronUpdater
 import { AppIpc } from '../../shared/appIpcChannels'
 import type { AppUpdateStatus } from '../../shared/appUpdateStatus'
 import { ipcErr, ipcOk, type IpcResult } from '../../shared/ipc'
@@ -11,6 +13,41 @@ function broadcast(msg: AppUpdateStatus) {
 }
 
 let listenersBound = false
+/** 已收到 update-downloaded，允许菜单「重启并完成更新」。 */
+let downloadReadyForQuitInstall = false
+let menuRefreshCallback: (() => void) | null = null
+
+export function setUpdaterMenuRefresh(fn: (() => void) | null): void {
+  menuRefreshCallback = fn
+}
+
+function maybeRefreshAppMenu(): void {
+  try {
+    menuRefreshCallback?.()
+  } catch {
+    /* ignore */
+  }
+}
+
+export function menuCanQuitAndInstall(): boolean {
+  return app.isPackaged && downloadReadyForQuitInstall
+}
+
+/** 帮助菜单：检查更新（与渲染进程 IPC 行为一致） */
+export function checkForUpdatesFromMenu(): void {
+  if (!app.isPackaged) return
+  bindAutoUpdaterEvents()
+  void autoUpdater.checkForUpdates().catch((e) =>
+    broadcast({ kind: 'error', message: e instanceof Error ? e.message : String(e) }),
+  )
+}
+
+/** 帮助菜单：安装已下载的更新并退出 */
+export function quitInstallFromMenu(): void {
+  if (!app.isPackaged || !downloadReadyForQuitInstall) return
+  bindAutoUpdaterEvents()
+  setImmediate(() => autoUpdater.quitAndInstall(false, true))
+}
 
 function bindAutoUpdaterEvents() {
   if (listenersBound) return
@@ -34,7 +71,11 @@ function bindAutoUpdaterEvents() {
   autoUpdater.on('download-progress', (p) =>
     broadcast({ kind: 'progress', percent: Math.round(p.percent), transferred: p.transferred, total: p.total }),
   )
-  autoUpdater.on('update-downloaded', (info) => broadcast({ kind: 'downloaded', version: info.version }))
+  autoUpdater.on('update-downloaded', (info) => {
+    downloadReadyForQuitInstall = true
+    maybeRefreshAppMenu()
+    broadcast({ kind: 'downloaded', version: info.version })
+  })
 }
 
 /** 打包后延迟静默检查（不阻塞启动） */

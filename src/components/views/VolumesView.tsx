@@ -128,51 +128,53 @@ export function VolumesView() {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden p-4">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <h2 className="text-sm font-semibold">{t('volumes.title')}</h2>
-        <div className="flex flex-wrap gap-2">
+      <div className="flex shrink-0 flex-col gap-2">
+        <div>
+          <h2 className="text-sm font-semibold">{t('volumes.title')}</h2>
+          <p className="mt-0.5 text-[10px] leading-snug text-zinc-500 dark:text-zinc-400">{t('volumes.selectionHint')}</p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <input
+            value={volName}
+            onChange={(e) => setVolName(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key !== 'Enter') return
+              if (busy || !volName.trim()) return
+              e.preventDefault()
+              onCreate()
+            }}
+            placeholder={t('volumes.createName')}
+            title={t('volumes.createName')}
+            aria-label={t('volumes.createNameAria')}
+            className="w-48 rounded-md border border-zinc-300 bg-white px-2 py-1 text-[11px] dark:border-zinc-600 dark:bg-zinc-900"
+          />
+          <button
+            type="button"
+            disabled={busy || !volName.trim()}
+            onClick={() => void onCreate()}
+            className="rounded-md bg-emerald-600 px-2 py-1 text-[11px] font-semibold text-white hover:bg-emerald-500 disabled:pointer-events-none disabled:opacity-40"
+          >
+            {t('volumes.createSubmit')}
+          </button>
           <button
             type="button"
             disabled={checkedNames.size === 0 || busy}
             onClick={() => void onRemoveSelected()}
-            className="rounded-md border border-rose-400 px-2 py-1 text-[11px] text-rose-800 dark:border-rose-800 dark:text-rose-200"
+            className="rounded-md border border-rose-400 px-2 py-1 text-[11px] text-rose-800 hover:bg-rose-50 disabled:pointer-events-none disabled:opacity-40 dark:border-rose-800 dark:text-rose-200 dark:hover:bg-rose-950/30"
           >
             {t('volumes.removeSelected')}
           </button>
         </div>
       </div>
-      <p className="text-[10px] leading-snug text-zinc-500 dark:text-zinc-400">{t('volumes.selectionHint')}</p>
-      <div className="flex flex-wrap items-end gap-2 rounded-lg border border-zinc-200/70 bg-zinc-50/80 p-2 text-[11px] dark:border-white/[0.06] dark:bg-zinc-900/50">
-        <span className="font-medium text-zinc-700 dark:text-zinc-300">{t('volumes.create')}</span>
-        <label className="flex flex-col gap-0.5">
-          <span className="text-[10px] text-zinc-500">{t('volumes.createName')}</span>
-          <input
-            value={volName}
-            onChange={(e) => setVolName(e.target.value)}
-            className="w-48 rounded border border-zinc-300 bg-white px-2 py-1 dark:border-zinc-600 dark:bg-zinc-950"
-          />
-        </label>
-        <button
-          type="button"
-          disabled={busy || !volName.trim()}
-          onClick={() => void onCreate()}
-          className="rounded-md bg-emerald-600 px-2 py-1 font-semibold text-white hover:bg-emerald-500 disabled:opacity-40"
-        >
-          {t('volumes.createSubmit')}
-        </button>
-      </div>
       {sel ? (
-        <div className="rounded-lg border border-zinc-200/70 bg-white/50 p-2 text-[10px] text-zinc-700 dark:border-white/[0.06] dark:bg-zinc-900/40 dark:text-zinc-300">
-          <div className="mb-1 font-medium">{t('volumes.usedBy')}</div>
-          {usedBy.length ? (
-            <ul className="font-mono">
-              {usedBy.map((id) => (
-                <li key={id}>{shortId(id)}</li>
-              ))}
-            </ul>
-          ) : (
-            <span className="text-zinc-500">—</span>
-          )}
+        <div className="flex min-w-0 shrink-0 flex-nowrap items-center gap-x-2 gap-y-1 overflow-x-auto rounded-lg border border-zinc-200/70 bg-zinc-50/80 px-2 py-1.5 text-[11px] dark:border-white/[0.06] dark:bg-zinc-900/50">
+          <span className="shrink-0 whitespace-nowrap text-zinc-500 dark:text-zinc-400">{t('volumes.usedBy')}</span>
+          <code
+            className="min-w-0 flex-1 truncate rounded bg-zinc-200/80 px-1 py-0.5 font-mono text-[10px] text-zinc-800 dark:bg-zinc-800 dark:text-zinc-200"
+            title={usedBy.length ? usedBy.map(shortId).join(', ') : undefined}
+          >
+            {usedBy.length ? usedBy.map(shortId).join(', ') : '—'}
+          </code>
         </div>
       ) : null}
       <div className="min-h-0 flex-1 overflow-auto rounded-lg border border-zinc-200/80 dark:border-white/[0.06]">
@@ -184,6 +186,7 @@ export function VolumesView() {
                   ref={headerCheckboxRef}
                   type="checkbox"
                   className="align-middle"
+                  disabled={volumeList.length === 0}
                   checked={allSelected}
                   onChange={toggleSelectAll}
                   title={t('common.selectAll')}
@@ -202,36 +205,47 @@ export function VolumesView() {
             </tr>
           </thead>
           <tbody>
-            {volumeList.map((v) => {
-              const active = v.Name === selectedVolumeName
-              const checked = checkedNames.has(v.Name)
-              return (
-                <tr
-                  key={v.Name}
-                  onClick={() => setSelectedVolumeName(v.Name)}
-                  className={`cursor-pointer border-b border-zinc-100 hover:bg-sky-500/5 dark:border-zinc-800/80 dark:hover:bg-sky-500/10 ${
-                    active ? 'bg-sky-500/10 dark:bg-sky-500/15' : ''
-                  }`}
+            {volumeList.length === 0 ? (
+              <tr>
+                <td
+                  colSpan={4}
+                  className="px-3 py-10 text-center text-[11px] leading-relaxed text-zinc-500 dark:text-zinc-400"
                 >
-                  <td className="px-1 py-1.5 align-middle" onClick={(e) => e.stopPropagation()}>
-                    <input
-                      type="checkbox"
-                      className="align-middle"
-                      checked={checked}
-                      onChange={(e) => {
-                        e.stopPropagation()
-                        toggleChecked(v.Name, e.target.checked)
-                      }}
-                      onClick={(e) => e.stopPropagation()}
-                      aria-label={v.Name}
-                    />
-                  </td>
-                  <td className="px-2 py-1.5 align-middle font-medium text-zinc-900 dark:text-zinc-100">{v.Name}</td>
-                  <td className="px-2 py-1.5 align-middle">{v.Driver ?? '—'}</td>
-                  <td className="px-2 py-1.5 align-middle font-mono text-zinc-600 dark:text-zinc-400">{v.Mountpoint ?? '—'}</td>
-                </tr>
-              )
-            })}
+                  {t('volumes.emptyTable')}
+                </td>
+              </tr>
+            ) : (
+              volumeList.map((v) => {
+                const active = v.Name === selectedVolumeName
+                const checked = checkedNames.has(v.Name)
+                return (
+                  <tr
+                    key={v.Name}
+                    onClick={() => setSelectedVolumeName(v.Name)}
+                    className={`cursor-pointer border-b border-zinc-100 hover:bg-sky-500/5 dark:border-zinc-800/80 dark:hover:bg-sky-500/10 ${
+                      active ? 'bg-sky-500/10 dark:bg-sky-500/15' : ''
+                    }`}
+                  >
+                    <td className="px-1 py-1.5 align-middle" onClick={(e) => e.stopPropagation()}>
+                      <input
+                        type="checkbox"
+                        className="align-middle"
+                        checked={checked}
+                        onChange={(e) => {
+                          e.stopPropagation()
+                          toggleChecked(v.Name, e.target.checked)
+                        }}
+                        onClick={(e) => e.stopPropagation()}
+                        aria-label={v.Name}
+                      />
+                    </td>
+                    <td className="px-2 py-1.5 align-middle font-medium text-zinc-900 dark:text-zinc-100">{v.Name}</td>
+                    <td className="px-2 py-1.5 align-middle">{v.Driver ?? '—'}</td>
+                    <td className="px-2 py-1.5 align-middle font-mono text-zinc-600 dark:text-zinc-400">{v.Mountpoint ?? '—'}</td>
+                  </tr>
+                )
+              })
+            )}
           </tbody>
         </table>
       </div>

@@ -1,11 +1,14 @@
 import { create } from 'zustand'
 import { unwrapIpc } from '@/lib/ipc'
 
-export type TabId = 'containers' | 'images' | 'networks' | 'volumes' | 'system' | 'events'
+export type TabId = 'containers' | 'images' | 'networks' | 'volumes' | 'metrics' | 'system' | 'events'
 
 type DockerState = {
   tab: TabId
   setTab: (t: TabId) => void
+  /** 顶栏/F5 在资源页触发刷新时递增，供 MetricsView 订阅 */
+  metricsRefreshTick: number
+  bumpMetricsRefresh: () => void
   connectionOk: boolean | null
   globalError: string | null
   busy: boolean
@@ -35,6 +38,8 @@ export const useDockerStore = create<DockerState>((set, get) => ({
     set({ tab: t })
     void get().loadTab(t)
   },
+  metricsRefreshTick: 0,
+  bumpMetricsRefresh: () => set((s) => ({ metricsRefreshTick: s.metricsRefreshTick + 1 })),
   connectionOk: null,
   globalError: null,
   busy: false,
@@ -71,7 +76,9 @@ export const useDockerStore = create<DockerState>((set, get) => ({
     const dk = window.dockerDesktop
     set({ busy: true, globalError: null })
     try {
-      if (get().connectionOk !== true) {
+      if (t === 'metrics') {
+        await get().ping()
+      } else if (get().connectionOk !== true) {
         await get().ping()
         if (get().connectionOk !== true) return
       }
@@ -97,6 +104,8 @@ export const useDockerStore = create<DockerState>((set, get) => ({
           unwrapIpc(dk.df()),
         ])
         set({ systemInfo: info, versionJson: ver, diskJson: df })
+      } else if (t === 'metrics') {
+        /* 资源页：主机指标由 IPC 拉取；引擎信息在页面内按需请求 */
       } else if (t === 'events') {
         /* 事件页数据由订阅流推送，此处仅确保连接可用 */
       }

@@ -1,4 +1,5 @@
 import { app, BrowserWindow, dialog, Menu, nativeTheme, shell } from 'electron'
+import { checkForUpdatesFromMenu, menuCanQuitAndInstall, quitInstallFromMenu } from './updater'
 import type { MenuItemConstructorOptions } from 'electron'
 import { openExternalUrlIfAllowed } from './openExternalPolicy'
 import {
@@ -22,6 +23,11 @@ let menuLang: AppLanguage = getDefaultAppLanguage()
 /** 与原生菜单、Electron 文件对话框文案同步 */
 export function getAppMenuLanguage(): AppLanguage {
   return menuLang
+}
+
+/** 供 updater 在下载完成后重建菜单，以刷新「重启并完成更新」可用态 */
+export function rebuildApplicationMenu(): void {
+  installAppMenu(menuTheme, menuLang)
 }
 
 function shellStrings(): AppShellStrings {
@@ -211,6 +217,17 @@ export function installAppMenu(themePref?: ThemePreference, language?: AppLangua
     {
       label: s.help,
       submenu: [
+        {
+          label: s.menuCheckForUpdates,
+          enabled: app.isPackaged,
+          click: () => checkForUpdatesFromMenu(),
+        },
+        {
+          label: s.menuRestartToInstall,
+          enabled: menuCanQuitAndInstall(),
+          click: () => quitInstallFromMenu(),
+        },
+        { type: 'separator' },
         { label: s.dockerEngineDocs, click: openDockerEngineDocs },
         { type: 'separator' },
         { label: s.helpOpenSourceRepository, click: openSourceRepository },

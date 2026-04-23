@@ -107,17 +107,25 @@ export function EventsView() {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden p-4">
-      <div className="flex flex-wrap items-center justify-between gap-2">
+      <div className="flex shrink-0 flex-col gap-2">
         <div>
           <h2 className="text-sm font-semibold">{t('events.title')}</h2>
-          <p className="mt-0.5 text-[10px] text-zinc-500">{t('events.subtitle')}</p>
+          <p className="mt-0.5 text-[10px] leading-snug text-zinc-500 dark:text-zinc-400">{t('events.subtitle')}</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <input
+            value={filter}
+            onChange={(e) => setFilter(e.target.value)}
+            placeholder={t('events.filterPlaceholder')}
+            title={t('events.filterLabel')}
+            aria-label={t('events.filterInputAria')}
+            className="w-48 rounded-md border border-zinc-300 bg-white px-2 py-1 font-mono text-[11px] dark:border-zinc-600 dark:bg-zinc-900"
+          />
           <button
             type="button"
             disabled={running || starting}
             onClick={() => void start()}
-            className="rounded-md bg-sky-600 px-2.5 py-1 text-[11px] font-semibold text-white hover:bg-sky-500 disabled:opacity-40"
+            className="rounded-md bg-sky-600 px-2 py-1 text-[11px] font-semibold text-white hover:bg-sky-500 disabled:pointer-events-none disabled:opacity-40"
           >
             {starting ? t('events.starting') : t('events.start')}
           </button>
@@ -125,28 +133,20 @@ export function EventsView() {
             type="button"
             disabled={!running}
             onClick={() => void stop()}
-            className="rounded-md border border-zinc-300 bg-white px-2.5 py-1 text-[11px] dark:border-zinc-600 dark:bg-zinc-900"
+            className="rounded-md border border-zinc-300 bg-white px-2 py-1 text-[11px] hover:bg-zinc-50 disabled:pointer-events-none disabled:opacity-40 dark:border-zinc-600 dark:bg-zinc-900 dark:hover:bg-zinc-800"
           >
             {t('events.stop')}
           </button>
           <button
             type="button"
+            disabled={lines.length === 0}
             onClick={() => void onClear()}
-            className="rounded-md border border-zinc-300 bg-white px-2.5 py-1 text-[11px] dark:border-zinc-600 dark:bg-zinc-900"
+            className="rounded-md border border-zinc-300 bg-white px-2 py-1 text-[11px] hover:bg-zinc-50 disabled:pointer-events-none disabled:opacity-40 dark:border-zinc-600 dark:bg-zinc-900 dark:hover:bg-zinc-800"
           >
             {t('events.clear')}
           </button>
         </div>
       </div>
-      <label className="flex max-w-md flex-col gap-0.5 text-[10px] text-zinc-600 dark:text-zinc-400">
-        <span>{t('events.filterLabel')}</span>
-        <input
-          value={filter}
-          onChange={(e) => setFilter(e.target.value)}
-          placeholder={t('events.filterPlaceholder')}
-          className="rounded-md border border-zinc-300 bg-white px-2 py-1 font-mono text-[11px] dark:border-zinc-600 dark:bg-zinc-950"
-        />
-      </label>
       <pre className="min-h-0 flex-1 overflow-auto rounded-lg border border-zinc-200/80 bg-zinc-100/80 p-2 font-mono text-[10px] leading-relaxed text-zinc-800 dark:border-white/[0.06] dark:bg-black/30 dark:text-zinc-200">
         {filteredLines.length ? filteredLines.join('\n') : t('events.empty')}
       </pre>

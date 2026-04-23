@@ -1,4 +1,5 @@
 import { useTranslation } from 'react-i18next'
+import { useModalEscape } from '@/hooks/useModalEscape'
 
 type Props = {
   open: boolean
@@ -9,13 +10,14 @@ type Props = {
 
 export function InspectJsonModal({ open, title, jsonText, onClose }: Props) {
   const { t } = useTranslation()
+  useModalEscape(open, onClose)
   if (!open) return null
   return (
     <div
       className="fixed inset-0 z-[115] flex items-center justify-center bg-black/50 p-4"
       role="dialog"
+      aria-modal="true"
       aria-labelledby="inspect-json-title"
-      onClick={onClose}
     >
       <div
         className="flex max-h-[88vh] w-full max-w-2xl flex-col overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-xl dark:border-zinc-700 dark:bg-zinc-900"

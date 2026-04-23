@@ -116,7 +116,7 @@ export function AppDialogProvider({ children }: { children: ReactNode }) {
         <div
           className="fixed inset-0 z-[200] flex items-center justify-center bg-black/50 p-4"
           role="presentation"
-          onClick={() => (visual.kind === 'alert' ? finish() : finish(false))}
+          data-app-dialog-overlay=""
         >
           <div
             ref={panelRef}

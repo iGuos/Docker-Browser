@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { useModalEscape } from '@/hooks/useModalEscape'
 import { RestartPolicyField } from '@/components/RestartPolicyField'
 import { useAppDialog } from '@/dialog/AppDialogContext'
 import { formatThrownEngineError } from '@/lib/alertMessage'
@@ -22,6 +23,8 @@ export function CreateContainerModal({ open, onClose, onCreated }: Props) {
   const [autoRemove, setAutoRemove] = useState(false)
   const [restartPolicy, setRestartPolicy] = useState<RestartPolicyName>('no')
   const [submitting, setSubmitting] = useState(false)
+
+  useModalEscape(open, onClose)
 
   if (!open) return null
 
@@ -52,7 +55,7 @@ export function CreateContainerModal({ open, onClose, onCreated }: Props) {
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
       role="dialog"
-      onClick={onClose}
+      aria-modal="true"
     >
       <div
         className="max-h-[90vh] w-full max-w-lg overflow-auto rounded-xl border border-zinc-200 bg-white p-4 shadow-xl dark:border-zinc-700 dark:bg-zinc-900"

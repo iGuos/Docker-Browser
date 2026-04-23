@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { useModalEscape } from '@/hooks/useModalEscape'
 import { inspectJsonToPublishText } from '@shared/inspectPorts'
 import { normalizeRestartPolicyName, type RestartPolicyName } from '@shared/restartPolicy'
 import { RestartPolicyField } from '@/components/RestartPolicyField'
@@ -51,6 +52,8 @@ export function EditContainerConfigModal({ open, containerId, onClose, onRecreat
     })
   }, [open, containerId])
 
+  useModalEscape(open, onClose)
+
   if (!open) return null
 
   const submit = async () => {
@@ -86,8 +89,8 @@ export function EditContainerConfigModal({ open, containerId, onClose, onRecreat
     <div
       className="fixed inset-0 z-[110] flex items-center justify-center bg-black/50 p-4"
       role="dialog"
+      aria-modal="true"
       aria-labelledby="edit-container-config-title"
-      onClick={onClose}
     >
       <div
         className="max-h-[90vh] w-full max-w-lg overflow-auto rounded-xl border border-zinc-200 bg-white p-4 shadow-xl dark:border-zinc-700 dark:bg-zinc-900"

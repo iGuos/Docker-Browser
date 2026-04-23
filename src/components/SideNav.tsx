@@ -6,6 +6,7 @@ const tabs: { id: TabId; labelKey: string }[] = [
   { id: 'images', labelKey: 'nav.images' },
   { id: 'networks', labelKey: 'nav.networks' },
   { id: 'volumes', labelKey: 'nav.volumes' },
+  { id: 'metrics', labelKey: 'nav.metrics' },
   { id: 'events', labelKey: 'nav.events' },
   { id: 'system', labelKey: 'nav.system' },
 ]

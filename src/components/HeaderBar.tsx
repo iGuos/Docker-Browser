@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useCallback, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import { LanguageSwitcher } from '@/components/LanguageSwitcher'
 import { ThemeSwitcher } from '@/components/ThemeSwitcher'
@@ -16,21 +16,29 @@ export function HeaderBar() {
   const tab = useDockerStore((s) => s.tab)
   const ping = useDockerStore((s) => s.ping)
   const loadTab = useDockerStore((s) => s.loadTab)
+  const bumpMetricsRefresh = useDockerStore((s) => s.bumpMetricsRefresh)
+
+  const runHeaderRefresh = useCallback(() => {
+    void ping().then(() => {
+      if (tab === 'metrics') bumpMetricsRefresh()
+      else void loadTab(tab)
+    })
+  }, [ping, loadTab, tab, bumpMetricsRefresh])
 
   const onRefresh = () => {
-    void ping().then(() => loadTab(tab))
+    runHeaderRefresh()
   }
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'F5') {
         e.preventDefault()
-        void ping().then(() => loadTab(tab))
+        runHeaderRefresh()
       }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [ping, loadTab, tab])
+  }, [runHeaderRefresh])
 
   const onDocs = () => {
     void unwrapIpc(window.dockerDesktop.openEngineDocs()).catch(async (e) => {

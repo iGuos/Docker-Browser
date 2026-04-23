@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useAppDialog } from '@/dialog/AppDialogContext'
+import { useModalEscape } from '@/hooks/useModalEscape'
 import { base64ToUtf8, utf8ToBase64 } from '@/lib/utf8Base64'
 import { alertEngineError } from '@/lib/alertMessage'
 
@@ -532,6 +533,11 @@ export function ContainerFilesWindowApp({
     setMkdirName('')
   }
 
+  useModalEscape(mkdirOpen, () => {
+    void requestCloseMkdir()
+  })
+  useModalEscape(editOpen, () => setEditOpen(false))
+
   const rootEntries = childrenCache.get(rootPath)
   const rootLoading = loadingDirs.has(rootPath)
   const showTree = rootBootstrapped && rootEntries !== undefined
@@ -736,7 +742,7 @@ export function ContainerFilesWindowApp({
         <div
           className="fixed inset-0 z-[120] flex items-center justify-center bg-black/50 p-4"
           role="dialog"
-          onClick={() => void requestCloseMkdir()}
+          aria-modal="true"
         >
           <div
             className="w-full max-w-sm rounded-lg border border-zinc-200 bg-white p-3 shadow-xl dark:border-zinc-700 dark:bg-zinc-900"
@@ -774,7 +780,7 @@ export function ContainerFilesWindowApp({
         <div
           className="fixed inset-0 z-[120] flex items-center justify-center bg-black/50 p-4"
           role="dialog"
-          onClick={() => setEditOpen(false)}
+          aria-modal="true"
         >
           <div
             className="flex max-h-[85vh] w-full max-w-3xl flex-col overflow-hidden rounded-lg border border-zinc-200 bg-white shadow-xl dark:border-zinc-700 dark:bg-zinc-900"

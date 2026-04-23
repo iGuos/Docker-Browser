@@ -9,6 +9,7 @@ import type { Readable } from 'node:stream'
 import type { ContainerCreateOptions, HostConfig } from 'dockerode'
 import type { DockerLogsChunk } from '../../shared/dockerLogs'
 import { DockerIpc } from '../../shared/dockerIpcChannels'
+import type { RunningContainersMemorySummary } from '../../shared/dockerMemorySummary'
 import { ipcErr, ipcOk, type IpcResult } from '../../shared/ipc'
 import { getDocker, resetDockerClient } from './dockerClient'
 import { demuxDockerLogStream } from './dockerLogDemux'
@@ -48,6 +49,52 @@ let registered = false
 
 function docker() {
   return getDocker()
+}
+
+/** 避免一次性并发过多 stats 把引擎拖慢，分批拉取。 */
+const CONTAINER_STATS_BATCH = 8
+
+function readContainerStatsMemoryUsageBytes(stats: unknown): number | null {
+  if (!stats || typeof stats !== 'object') return null
+  const ms = (stats as Record<string, unknown>).memory_stats
+  if (!ms || typeof ms !== 'object') return null
+  const m = ms as Record<string, unknown>
+  const usage = m.usage
+  if (typeof usage === 'number' && Number.isFinite(usage) && usage >= 0) return usage
+  const st = m.stats
+  if (st && typeof st === 'object') {
+    const o = st as Record<string, unknown>
+    const anon = typeof o.anon === 'number' && Number.isFinite(o.anon) ? o.anon : 0
+    const file = typeof o.file === 'number' && Number.isFinite(o.file) ? o.file : 0
+    const t = anon + file
+    if (t > 0) return t
+  }
+  return null
+}
+
+async function collectRunningContainersMemoryParts(
+  list: { Id?: string }[],
+): Promise<{ used: number; counted: number; skipped: number }[]> {
+  const parts: { used: number; counted: number; skipped: number }[] = []
+  for (let i = 0; i < list.length; i += CONTAINER_STATS_BATCH) {
+    const batch = list.slice(i, i + CONTAINER_STATS_BATCH)
+    const chunk = await Promise.all(
+      batch.map(async (row) => {
+        const id = typeof row.Id === 'string' ? row.Id : ''
+        if (!id) return { used: 0, counted: 0, skipped: 1 }
+        try {
+          const stats = await docker().getContainer(id).stats({ stream: false })
+          const u = readContainerStatsMemoryUsageBytes(stats)
+          if (u !== null) return { used: u, counted: 1, skipped: 0 }
+          return { used: 0, counted: 0, skipped: 1 }
+        } catch {
+          return { used: 0, counted: 0, skipped: 1 }
+        }
+      }),
+    )
+    parts.push(...chunk)
+  }
+  return parts
 }
 
 function senderWindow(evt: { sender: WebContents }): BrowserWindow | null {
@@ -882,6 +929,47 @@ export function registerDockerIpc(): void {
       } catch (e) {
         return ipcErr(e instanceof Error ? e.message : String(e))
       }
+    },
+  )
+
+  ipcMain.handle(
+    DockerIpc.runningContainersMemorySummary,
+    async (): Promise<IpcResult<RunningContainersMemorySummary>> => {
+      try {
+        const list = await docker().listContainers()
+        const parts = await collectRunningContainersMemoryParts(list)
+        const usedBytes = parts.reduce((a, p) => a + p.used, 0)
+        const countedContainers = parts.reduce((a, p) => a + p.counted, 0)
+        const skippedContainers = parts.reduce((a, p) => a + p.skipped, 0)
+        return ipcOk({ usedBytes, countedContainers, skippedContainers })
+      } catch (e) {
+        return ipcErr(e instanceof Error ? e.message : String(e))
+      }
+    },
+  )
+
+  ipcMain.handle(
+    DockerIpc.containersMemoryUsage,
+    async (_evt, idsUnknown: unknown): Promise<IpcResult<Record<string, number>>> => {
+      if (!Array.isArray(idsUnknown)) return ipcErr('container id list required')
+      const rawIds = idsUnknown.filter((x): x is string => typeof x === 'string' && x.trim().length > 0)
+      if (rawIds.length === 0) return ipcOk({})
+      const out: Record<string, number> = {}
+      for (let i = 0; i < rawIds.length; i += CONTAINER_STATS_BATCH) {
+        const batch = rawIds.slice(i, i + CONTAINER_STATS_BATCH)
+        await Promise.all(
+          batch.map(async (id) => {
+            try {
+              const stats = await docker().getContainer(id.trim()).stats({ stream: false })
+              const u = readContainerStatsMemoryUsageBytes(stats)
+              if (u !== null) out[id.trim()] = u
+            } catch {
+              /* skip */
+            }
+          }),
+        )
+      }
+      return ipcOk(out)
     },
   )
 

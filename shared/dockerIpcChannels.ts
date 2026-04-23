@@ -50,6 +50,8 @@ export const DockerIpc = {
   networkDisconnect: 'docker:network-disconnect',
   volumeUsedBy: 'docker:volume-used-by',
   containerStatsOnce: 'docker:container-stats-once',
+  runningContainersMemorySummary: 'docker:running-containers-memory-summary',
+  containersMemoryUsage: 'docker:containers-memory-usage',
   imageHistory: 'docker:image-history',
   saveImageTar: 'docker:save-image-tar',
   loadImageTar: 'docker:load-image-tar',

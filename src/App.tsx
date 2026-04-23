@@ -8,6 +8,7 @@ import { NetworksView } from '@/components/views/NetworksView'
 import { VolumesView } from '@/components/views/VolumesView'
 import { SystemView } from '@/components/views/SystemView'
 import { EventsView } from '@/components/views/EventsView'
+import { MetricsView } from '@/components/views/MetricsView'
 import { useDockerStore } from '@/stores/dockerStore'
 import { setAppLanguage } from '@/i18n/i18n'
 
@@ -47,7 +48,7 @@ export default function App() {
           <SideNav />
           <div className="flex min-h-0 min-w-0 flex-1 flex-col">
             <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
-              {busy && tab !== 'system' && tab !== 'events' ? (
+              {busy && tab !== 'system' && tab !== 'events' && tab !== 'metrics' ? (
                 <div
                   className="absolute inset-0 z-20 flex cursor-wait items-center justify-center bg-white/50 text-xs dark:bg-zinc-950/50"
                   role="status"
@@ -61,6 +62,7 @@ export default function App() {
               {tab === 'images' ? <ImagesView /> : null}
               {tab === 'networks' ? <NetworksView /> : null}
               {tab === 'volumes' ? <VolumesView /> : null}
+              {tab === 'metrics' ? <MetricsView /> : null}
               {tab === 'events' ? <EventsView /> : null}
               {tab === 'system' ? <SystemView /> : null}
             </div>

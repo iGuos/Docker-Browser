@@ -4,6 +4,7 @@ import {
   useMemo,
   useRef,
   useState,
+  type PointerEvent as ReactPointerEvent,
   type ReactNode,
   type TextareaHTMLAttributes,
 } from 'react'
@@ -29,6 +30,10 @@ import {
   ALL_CONTAINER_COLS,
   loadColVisibility,
   saveColVisibility,
+  loadColWidths,
+  saveColWidths,
+  MAX_COL_PX,
+  MIN_COL_PX,
   type ContainerTableColId,
 } from '@/lib/containerTablePreferences'
 import { loadExecHistory, pushExecHistory } from '@/lib/execCommandHistory'
@@ -43,7 +48,7 @@ type Row = {
   Labels?: Record<string, string>
 }
 
-type SortKey = 'name' | 'id' | 'image' | 'ports' | 'state' | 'status' | 'health' | null
+type SortKey = 'name' | 'id' | 'image' | 'ports' | 'state' | 'status' | 'memory' | 'health' | null
 
 type FlatRow =
   | {
@@ -57,6 +62,18 @@ type FlatRow =
 
 function shortId(id: string): string {
   return id.replace(/^sha256:/i, '').slice(0, 12)
+}
+
+function formatBytes(n: number): string {
+  if (!Number.isFinite(n) || n < 0) return '—'
+  const units = ['B', 'KB', 'MB', 'GB', 'TB']
+  let v = n
+  let u = 0
+  while (v >= 1024 && u < units.length - 1) {
+    v /= 1024
+    u++
+  }
+  return `${u === 0 ? Math.round(v) : v.toFixed(1)} ${units[u]}`
 }
 
 function displayName(c: Row): string {
@@ -84,7 +101,7 @@ function healthLabel(
   return { key: 'none', text: '—' }
 }
 
-function sortRows(rows: Row[], key: SortKey, asc: boolean): Row[] {
+function sortRows(rows: Row[], key: SortKey, asc: boolean, memById: Record<string, number>): Row[] {
   if (!key) return rows
   const dir = asc ? 1 : -1
   const cmp = (a: Row, b: Row): number => {
@@ -101,12 +118,63 @@ function sortRows(rows: Row[], key: SortKey, asc: boolean): Row[] {
       return dir * (a.State ?? '').localeCompare(b.State ?? '', undefined, { sensitivity: 'base' })
     if (key === 'status')
       return dir * (a.Status ?? '').localeCompare(b.Status ?? '', undefined, { sensitivity: 'base' })
+    if (key === 'memory') {
+      const av = isStrictRunning(a) ? (memById[a.Id] ?? -1) : -1
+      const bv = isStrictRunning(b) ? (memById[b.Id] ?? -1) : -1
+      if (av !== bv) return dir * (av - bv)
+      return dir * displayName(a).localeCompare(displayName(b), undefined, { sensitivity: 'base' })
+    }
     return dir * (healthRank(a.Status) - healthRank(b.Status))
   }
   return [...rows].sort(cmp)
 }
 
+function containerStateLower(c: Row | null | undefined): string {
+  return (c?.State ?? '').toLowerCase()
+}
+
+/** 一次性执行、容器内文件、stats 快照等：仅「运行中」可用 */
+function isStrictRunning(c: Row | null | undefined): boolean {
+  if (!c) return false
+  return containerStateLower(c) === 'running'
+}
+
+function canUseStart(c: Row | null | undefined): boolean {
+  if (!c) return false
+  const s = containerStateLower(c)
+  return s !== 'running' && s !== 'restarting' && s !== 'paused' && s !== 'removing'
+}
+
+function canUseStop(c: Row | null | undefined): boolean {
+  if (!c) return false
+  const s = containerStateLower(c)
+  return s === 'running' || s === 'restarting' || s === 'paused'
+}
+
+function canUseRestart(c: Row | null | undefined): boolean {
+  if (!c) return false
+  return containerStateLower(c) !== 'removing'
+}
+
+function canUseKill(c: Row | null | undefined): boolean {
+  if (!c) return false
+  const s = containerStateLower(c)
+  return s === 'running' || s === 'restarting'
+}
+
+function canUsePause(c: Row | null | undefined): boolean {
+  if (!c) return false
+  return containerStateLower(c) === 'running'
+}
+
+function canUseUnpause(c: Row | null | undefined): boolean {
+  if (!c) return false
+  return containerStateLower(c) === 'paused'
+}
+
 const CTX_MENU_COUNT = 6
+
+const BTN_DISABLED = 'disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-40'
 
 export function ContainersView() {
   const { t, i18n } = useTranslation()
@@ -140,6 +208,11 @@ export function ContainersView() {
   const [sortKey, setSortKey] = useState<SortKey>('name')
   const [sortAsc, setSortAsc] = useState(true)
   const [colVis, setColVis] = useState(loadColVisibility)
+  const [colWidths, setColWidths] = useState(loadColWidths)
+  const colWidthsRef = useRef(colWidths)
+  colWidthsRef.current = colWidths
+  const colResizeDrag = useRef<{ id: ContainerTableColId; startX: number; startW: number } | null>(null)
+  const [memById, setMemById] = useState<Record<string, number>>({})
   const [colsMenuOpen, setColsMenuOpen] = useState(false)
   const colsMenuWrapRef = useRef<HTMLDivElement>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
@@ -147,6 +220,13 @@ export function ContainersView() {
   const bulkHeaderCheckboxRef = useRef<HTMLInputElement>(null)
 
   const containers = useDockerStore((s) => s.containers) as Row[]
+  const runningIdsSig = useMemo(() => {
+    return containers
+      .filter((c) => isStrictRunning(c))
+      .map((c) => c.Id)
+      .sort()
+      .join('\0')
+  }, [containers])
   const busy = useDockerStore((s) => s.busy)
   const selectedContainerId = useDockerStore((s) => s.selectedContainerId)
   const setSelectedContainerId = useDockerStore((s) => s.setSelectedContainerId)
@@ -154,9 +234,35 @@ export function ContainersView() {
 
   const sel = containers.find((c) => c.Id === selectedContainerId) ?? null
 
+  const ctxMenuRow = useMemo(
+    () => (ctxMenu ? (containers.find((c) => c.Id === ctxMenu.containerId) ?? null) : null),
+    [ctxMenu, containers],
+  )
+  const ctxMenuStrictRunning = isStrictRunning(ctxMenuRow)
+
   useEffect(() => {
     saveColVisibility(colVis)
   }, [colVis])
+
+  useEffect(() => {
+    saveColWidths(colWidths)
+  }, [colWidths])
+
+  useEffect(() => {
+    if (!runningIdsSig) {
+      setMemById({})
+      return
+    }
+    const ids = runningIdsSig.split('\0')
+    let cancelled = false
+    void window.dockerDesktop.containersMemoryUsage(ids).then((res) => {
+      if (cancelled || !res.ok) return
+      setMemById(res.data)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [runningIdsSig])
 
   const grouped = useMemo(
     () => groupContainersByComposeProject(containers, t('containers.projectUngrouped')),
@@ -167,9 +273,9 @@ export function ContainersView() {
     if (!sortKey) return grouped
     return grouped.map((g) => ({
       ...g,
-      items: sortRows(g.items, sortKey, sortAsc),
+      items: sortRows(g.items, sortKey, sortAsc, memById),
     }))
-  }, [grouped, sortKey, sortAsc])
+  }, [grouped, sortKey, sortAsc, memById])
 
   const flatRows = useMemo((): FlatRow[] => {
     const out: FlatRow[] = []
@@ -354,6 +460,10 @@ export function ContainersView() {
         e.preventDefault()
         const id = ctxMenu.containerId
         const idx = ctxMenuIndexRef.current
+        const row = containers.find((c) => c.Id === id)
+        const strictRunning = isStrictRunning(row ?? null)
+        if (idx === 1 && !strictRunning) return
+        if (idx === 5 && !strictRunning) return
         setCtxMenu(null)
         if (idx === 0) openLogsWindow(id)
         else if (idx === 1) openFilesWindow(id)
@@ -373,7 +483,7 @@ export function ContainersView() {
       if (attached) document.removeEventListener('pointerdown', onPointer, true)
       window.removeEventListener('keydown', onKey, true)
     }
-  }, [ctxMenu, openFilesWindow, openInspect, openLogsWindow, openStats])
+  }, [ctxMenu, containers, openFilesWindow, openInspect, openLogsWindow, openStats])
 
   const exportTar = async (id: string) => {
     if (!(await confirm(t('containers.exportTarConfirm')))) return
@@ -467,6 +577,7 @@ export function ContainersView() {
 
   const onExec = async () => {
     if (!sel) return
+    if (!isStrictRunning(sel)) return
     const cmd = execCmd.trim()
     if (!cmd) return
     pushExecHistory(cmd)
@@ -506,24 +617,71 @@ export function ContainersView() {
   }
 
   const visibleCols = ALL_CONTAINER_COLS.filter((c) => colVis[c])
-  /** 首列复选框 + 次列展开（数据行为空），与项目组行对齐 */
-  const gridTemplate = `28px 22px ${visibleCols.map(() => 'minmax(0,1fr)').join(' ')} 2rem`
+  /** 首列复选框 + 次列展开；数据列固定 px 便于拖拽调宽 */
+  const gridTemplate = `28px 22px ${visibleCols.map((id) => `${colWidths[id]}px`).join(' ')} 2rem`
+
+  /** 仅改变 `id` 对应列的 `colWidths[id]`，其它列宽度不变（在 window 上跟指针，避免表头/sticky 丢事件） */
+  const startColResize = useCallback((id: ContainerTableColId, e: ReactPointerEvent<HTMLDivElement>) => {
+    if (e.pointerType === 'mouse' && e.button !== 0) return
+    e.preventDefault()
+    e.stopPropagation()
+    const pointerId = e.pointerId
+    const startX = e.clientX
+    const startW = colWidthsRef.current[id]
+    colResizeDrag.current = { id, startX, startW }
+
+    const onMove = (ev: PointerEvent) => {
+      if (ev.pointerId !== pointerId) return
+      const d = colResizeDrag.current
+      if (!d) return
+      const nw = Math.min(MAX_COL_PX, Math.max(MIN_COL_PX, d.startW + ev.clientX - d.startX))
+      setColWidths((w) => (w[d.id] === nw ? w : { ...w, [d.id]: nw }))
+    }
+    const end = (ev: PointerEvent) => {
+      if (ev.pointerId !== pointerId) return
+      colResizeDrag.current = null
+      window.removeEventListener('pointermove', onMove)
+      window.removeEventListener('pointerup', end)
+      window.removeEventListener('pointercancel', end)
+      document.body.style.removeProperty('cursor')
+      document.body.style.removeProperty('user-select')
+    }
+
+    document.body.style.cursor = 'col-resize'
+    document.body.style.userSelect = 'none'
+    window.addEventListener('pointermove', onMove)
+    window.addEventListener('pointerup', end)
+    window.addEventListener('pointercancel', end)
+  }, [])
 
   const renderHeaderCell = (id: ContainerTableColId, label: string) => {
     if (!colVis[id]) return null
     const active = sortKey === id
     return (
-      <button
+      <div
         key={id}
-        type="button"
-        onClick={() => onHeaderSort(id)}
-        className={`truncate border-b border-zinc-200 px-1.5 py-2 text-left text-[11px] font-medium hover:bg-zinc-200/60 dark:border-zinc-800 dark:hover:bg-zinc-800/60 ${
-          active ? 'text-sky-700 dark:text-sky-300' : ''
-        }`}
+        className="relative z-0 flex min-w-0 overflow-visible border-b border-zinc-200 dark:border-zinc-800"
       >
-        {label}
-        {active ? (sortAsc ? ' ↑' : ' ↓') : ''}
-      </button>
+        <button
+          type="button"
+          onClick={() => onHeaderSort(id)}
+          className={`relative z-0 min-w-0 flex-1 truncate py-2 pl-1.5 pr-5 text-left text-[11px] font-medium hover:bg-zinc-200/60 dark:hover:bg-zinc-800/60 ${
+            active ? 'text-sky-700 dark:text-sky-300' : ''
+          }`}
+        >
+          {label}
+          {active ? (sortAsc ? ' ↑' : ' ↓') : ''}
+        </button>
+        {/* 拖条必须完全落在本格内；先前 -translate-x-1/2 会伸进右邻格，邻格叠在上面导致无法命中 */}
+        <div
+          className="absolute right-0 top-0 z-20 h-full w-3 shrink-0 cursor-col-resize touch-none select-none hover:bg-sky-500/25 dark:hover:bg-sky-400/20"
+          title={t('containers.colResizeHint')}
+          role="separator"
+          aria-orientation="vertical"
+          aria-label={t('containers.colResizeAria', { column: label })}
+          onPointerDown={(ev) => startColResize(id, ev)}
+        />
+      </div>
     )
   }
 
@@ -534,9 +692,11 @@ export function ContainersView() {
     const cells: ReactNode[] = []
     if (colVis.name)
       cells.push(
-        <div key="n" className="flex min-w-0 items-center gap-1 truncate px-1.5 py-1 font-medium">
+        <div key="n" className="flex min-w-0 items-start gap-1 px-1.5 py-1 font-medium">
           <span className="inline-block w-2 shrink-0 self-stretch border-l-2 border-sky-500/35" aria-hidden />
-          <span className="truncate">{displayName(c)}</span>
+          <span className="min-w-0 flex-1 cursor-text select-text break-words" title={displayName(c)}>
+            {displayName(c)}
+          </span>
         </div>,
       )
     if (colVis.id)
@@ -561,7 +721,11 @@ export function ContainersView() {
       )
     if (colVis.image)
       cells.push(
-        <div key="im" className="truncate px-1.5 py-1 text-zinc-700 dark:text-zinc-300" title={c.Image ?? ''}>
+        <div
+          key="im"
+          className="min-w-0 cursor-text select-text break-words px-1.5 py-1 text-zinc-700 dark:text-zinc-300"
+          title={c.Image ?? ''}
+        >
           {c.Image ?? '—'}
         </div>,
       )
@@ -587,6 +751,18 @@ export function ContainersView() {
           {localizeContainerStatus(c.Status, t, i18n.resolvedLanguage ?? i18n.language)}
         </div>,
       )
+    if (colVis.memory)
+      cells.push(
+        <div
+          key="mem"
+          className="whitespace-nowrap px-1.5 py-1 font-mono text-[10px] text-zinc-700 tabular-nums dark:text-zinc-300"
+          title={
+            isStrictRunning(c) && memById[c.Id] != null ? `${formatBytes(memById[c.Id])} · ${t('containers.memColHint')}` : undefined
+          }
+        >
+          {isStrictRunning(c) && memById[c.Id] != null ? formatBytes(memById[c.Id]) : '—'}
+        </div>,
+      )
     if (colVis.health)
       cells.push(
         <div
@@ -609,7 +785,11 @@ export function ContainersView() {
         key={c.Id}
         ref={active ? selectedRowRef : undefined}
         role="row"
-        onClick={() => setSelectedContainerId(c.Id)}
+        onClick={() => {
+          const sel = typeof window !== 'undefined' ? (window.getSelection()?.toString() ?? '') : ''
+          if (sel.length > 0) return
+          setSelectedContainerId(c.Id)
+        }}
         onContextMenu={(e) => {
           e.preventDefault()
           setSelectedContainerId(c.Id)
@@ -686,57 +866,62 @@ export function ContainersView() {
         <div className="flex flex-wrap gap-2">
           <button
             type="button"
-            disabled={!sel || busy}
+            disabled={!sel || busy || !canUseStart(sel)}
+            title={sel && !busy && !canUseStart(sel) ? t('containers.hintStartDisabled') : undefined}
             onClick={() => sel && void run(async () => unwrapIpc(window.dockerDesktop.startContainer(sel.Id)))}
-            className="rounded-md bg-zinc-800 px-2 py-1 text-[11px] font-medium text-white hover:bg-zinc-700 disabled:opacity-40 dark:bg-zinc-200 dark:text-zinc-900 dark:hover:bg-white"
+            className={`rounded-md bg-zinc-800 px-2 py-1 text-[11px] font-medium text-white hover:bg-zinc-700 dark:bg-zinc-200 dark:text-zinc-900 dark:hover:bg-white ${BTN_DISABLED}`}
           >
             {t('containers.start')}
           </button>
           <button
             type="button"
-            disabled={!sel || busy}
+            disabled={!sel || busy || !canUseStop(sel)}
+            title={sel && !busy && !canUseStop(sel) ? t('containers.hintStopDisabled') : undefined}
             onClick={() => sel && void run(async () => unwrapIpc(window.dockerDesktop.stopContainer(sel.Id)))}
-            className="rounded-md border border-zinc-300 bg-white px-2 py-1 text-[11px] dark:border-zinc-600 dark:bg-zinc-900"
+            className={`rounded-md border border-zinc-300 bg-white px-2 py-1 text-[11px] hover:bg-zinc-50 dark:border-zinc-600 dark:bg-zinc-900 dark:hover:bg-zinc-800 ${BTN_DISABLED}`}
           >
             {t('containers.stop')}
           </button>
           <button
             type="button"
-            disabled={!sel || busy}
+            disabled={!sel || busy || !canUseRestart(sel)}
             onClick={() => sel && void run(async () => unwrapIpc(window.dockerDesktop.restartContainer(sel.Id)))}
-            className="rounded-md border border-zinc-300 bg-white px-2 py-1 text-[11px] dark:border-zinc-600 dark:bg-zinc-900"
+            className={`rounded-md border border-zinc-300 bg-white px-2 py-1 text-[11px] hover:bg-zinc-50 dark:border-zinc-600 dark:bg-zinc-900 dark:hover:bg-zinc-800 ${BTN_DISABLED}`}
           >
             {t('containers.restart')}
           </button>
           <button
             type="button"
-            disabled={!sel || busy}
+            disabled={!sel || busy || !canUseKill(sel)}
+            title={sel && !busy && !canUseKill(sel) ? t('containers.hintKillPauseDisabled') : undefined}
             onClick={() => sel && void run(async () => unwrapIpc(window.dockerDesktop.killContainer(sel.Id)))}
-            className="rounded-md border border-rose-300 bg-rose-50 px-2 py-1 text-[11px] text-rose-900 dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-100"
+            className={`rounded-md border border-rose-300 bg-rose-50 px-2 py-1 text-[11px] text-rose-900 hover:bg-rose-100 dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-100 dark:hover:bg-rose-950/60 ${BTN_DISABLED}`}
           >
             {t('containers.kill')}
           </button>
           <button
             type="button"
-            disabled={!sel || busy}
+            disabled={!sel || busy || !canUsePause(sel)}
+            title={sel && !busy && !canUsePause(sel) ? t('containers.hintPauseDisabled') : undefined}
             onClick={() => sel && void run(async () => unwrapIpc(window.dockerDesktop.pauseContainer(sel.Id)))}
-            className="rounded-md border border-zinc-300 bg-white px-2 py-1 text-[11px] dark:border-zinc-600 dark:bg-zinc-900"
+            className={`rounded-md border border-zinc-300 bg-white px-2 py-1 text-[11px] hover:bg-zinc-50 dark:border-zinc-600 dark:bg-zinc-900 dark:hover:bg-zinc-800 ${BTN_DISABLED}`}
           >
             {t('containers.pause')}
           </button>
           <button
             type="button"
-            disabled={!sel || busy}
+            disabled={!sel || busy || !canUseUnpause(sel)}
+            title={sel && !busy && !canUseUnpause(sel) ? t('containers.hintUnpauseDisabled') : undefined}
             onClick={() => sel && void run(async () => unwrapIpc(window.dockerDesktop.unpauseContainer(sel.Id)))}
-            className="rounded-md border border-zinc-300 bg-white px-2 py-1 text-[11px] dark:border-zinc-600 dark:bg-zinc-900"
+            className={`rounded-md border border-zinc-300 bg-white px-2 py-1 text-[11px] hover:bg-zinc-50 dark:border-zinc-600 dark:bg-zinc-900 dark:hover:bg-zinc-800 ${BTN_DISABLED}`}
           >
             {t('containers.unpause')}
           </button>
           <button
             type="button"
-            disabled={!sel || busy}
+            disabled={!sel || busy || containerStateLower(sel) === 'removing'}
             onClick={() => void onRemove()}
-            className="rounded-md border border-rose-400 px-2 py-1 text-[11px] text-rose-800 dark:border-rose-800 dark:text-rose-200"
+            className={`rounded-md border border-rose-400 px-2 py-1 text-[11px] text-rose-800 hover:bg-rose-50 dark:border-rose-800 dark:text-rose-200 dark:hover:bg-rose-950/30 ${BTN_DISABLED}`}
           >
             {t('containers.remove')}
           </button>
@@ -783,7 +968,7 @@ export function ContainersView() {
         className="min-h-0 flex-1 overflow-auto rounded-lg border border-zinc-200/80 dark:border-white/[0.06]"
       >
         <div
-          className="sticky top-0 z-10 grid border-b border-zinc-200 bg-zinc-100/95 text-zinc-600 backdrop-blur dark:border-zinc-800 dark:bg-zinc-900/95 dark:text-zinc-400"
+          className="sticky top-0 z-20 grid border-b border-zinc-200 bg-zinc-100/95 text-zinc-600 backdrop-blur dark:border-zinc-800 dark:bg-zinc-900/95 dark:text-zinc-400"
           style={{ gridTemplateColumns: gridTemplate }}
         >
           <div
@@ -807,6 +992,7 @@ export function ContainersView() {
           {renderHeaderCell('ports', t('containers.portsColumnTitle'))}
           {renderHeaderCell('state', t('common.state'))}
           {renderHeaderCell('status', t('common.status'))}
+          {renderHeaderCell('memory', t('containers.col_memory'))}
           {renderHeaderCell('health', t('containers.healthCol'))}
           <div
             ref={colsMenuWrapRef}
@@ -829,9 +1015,6 @@ export function ContainersView() {
                 className="absolute right-0 top-full z-30 mt-0.5 min-w-[11rem] rounded-md border border-zinc-200 bg-white py-1.5 text-[11px] shadow-lg dark:border-zinc-600 dark:bg-zinc-900"
                 onMouseDown={(e) => e.stopPropagation()}
               >
-                <div className="px-2.5 pb-1 text-[10px] font-semibold text-zinc-500 dark:text-zinc-400">
-                  {t('containers.columns')}
-                </div>
                 {ALL_CONTAINER_COLS.map((id) => (
                   <label
                     key={id}
@@ -841,7 +1024,10 @@ export function ContainersView() {
                     <span>{t(`containers.col_${id}`)}</span>
                   </label>
                 ))}
-                <p className="mt-1 border-t border-zinc-100 px-2.5 pt-1.5 text-[9px] leading-snug text-zinc-400 dark:border-zinc-800 dark:text-zinc-500">
+                <div className="mt-1 border-t border-zinc-100 px-2.5 pb-0.5 pt-1.5 text-[10px] font-semibold text-zinc-500 dark:border-zinc-800 dark:text-zinc-400">
+                  {t('containers.columns')}
+                </div>
+                <p className="px-2.5 pb-1 text-[9px] leading-snug text-zinc-400 dark:text-zinc-500">
                   {t('containers.virtualHint')}
                 </p>
               </div>
@@ -1010,7 +1196,9 @@ export function ContainersView() {
           <h3 className="mb-1 text-[11px] font-semibold text-zinc-800 dark:text-zinc-200">
             {t('containers.execTitle')}
           </h3>
-          <p className="mb-2 text-[10px] text-zinc-500">{t('containers.execHint')}</p>
+          {!isStrictRunning(sel) ? (
+            <p className="mb-2 text-[10px] text-amber-800/90 dark:text-amber-200/90">{t('containers.hintNeedsRunning')}</p>
+          ) : null}
           <div className="flex flex-wrap items-end gap-2">
             <div className="flex min-w-[200px] flex-1 flex-col gap-1">
               <textarea
@@ -1038,9 +1226,10 @@ export function ContainersView() {
             </label>
             <button
               type="button"
-              disabled={execBusy || !execCmd.trim()}
+              disabled={execBusy || !execCmd.trim() || !isStrictRunning(sel)}
+              title={sel && !isStrictRunning(sel) ? t('containers.hintNeedsRunning') : undefined}
               onClick={() => void onExec()}
-              className="rounded-md bg-sky-600 px-2.5 py-1.5 text-[11px] font-semibold text-white hover:bg-sky-500 disabled:opacity-40"
+              className={`rounded-md bg-sky-600 px-2.5 py-1.5 text-[11px] font-semibold text-white hover:bg-sky-500 ${BTN_DISABLED}`}
             >
               {execBusy ? t('common.loading') : t('containers.execRun')}
             </button>
@@ -1048,7 +1237,7 @@ export function ContainersView() {
               type="button"
               disabled={!execBusy}
               onClick={() => onExecCancel()}
-              className="rounded-md border border-zinc-300 px-2 py-1.5 text-[11px] dark:border-zinc-600 dark:bg-zinc-900"
+              className={`rounded-md border border-zinc-300 px-2 py-1.5 text-[11px] hover:bg-zinc-50 dark:border-zinc-600 dark:bg-zinc-900 dark:hover:bg-zinc-800 ${BTN_DISABLED}`}
             >
               {t('containers.execCancel')}
             </button>
@@ -1056,7 +1245,7 @@ export function ContainersView() {
               type="button"
               disabled={!execOut}
               onClick={() => void copyExecOut()}
-              className="rounded-md border border-zinc-300 px-2 py-1.5 text-[11px] dark:border-zinc-600 dark:bg-zinc-900"
+              className={`rounded-md border border-zinc-300 px-2 py-1.5 text-[11px] hover:bg-zinc-50 dark:border-zinc-600 dark:bg-zinc-900 dark:hover:bg-zinc-800 ${BTN_DISABLED}`}
             >
               {t('containers.execCopy')}
             </button>
@@ -1066,6 +1255,7 @@ export function ContainersView() {
               {execOut}
             </pre>
           ) : null}
+          <p className="mt-2 text-[10px] leading-snug text-zinc-500 dark:text-zinc-400">{t('containers.execHint')}</p>
         </div>
       ) : null}
 
@@ -1080,7 +1270,7 @@ export function ContainersView() {
           <button
             type="button"
             role="menuitem"
-            className={`block w-full px-3 py-2 text-left hover:bg-zinc-100 dark:hover:bg-zinc-800 ${ctxMenuIndex === 0 ? 'bg-zinc-100 dark:bg-zinc-800' : ''}`}
+            className={`block w-full px-3 py-2 text-left enabled:hover:bg-zinc-100 dark:enabled:hover:bg-zinc-800 ${ctxMenuIndex === 0 ? 'bg-zinc-100 dark:bg-zinc-800' : ''}`}
             onMouseEnter={() => {
               ctxMenuIndexRef.current = 0
               setCtxMenuIndex(0)
@@ -1095,12 +1285,15 @@ export function ContainersView() {
           <button
             type="button"
             role="menuitem"
-            className={`block w-full px-3 py-2 text-left hover:bg-zinc-100 dark:hover:bg-zinc-800 ${ctxMenuIndex === 1 ? 'bg-zinc-100 dark:bg-zinc-800' : ''}`}
+            disabled={!ctxMenuStrictRunning}
+            title={!ctxMenuStrictRunning ? t('containers.hintNeedsRunning') : undefined}
+            className={`block w-full px-3 py-2 text-left enabled:hover:bg-zinc-100 dark:enabled:hover:bg-zinc-800 ${ctxMenuIndex === 1 ? 'bg-zinc-100 dark:bg-zinc-800' : ''} ${BTN_DISABLED}`}
             onMouseEnter={() => {
               ctxMenuIndexRef.current = 1
               setCtxMenuIndex(1)
             }}
             onClick={() => {
+              if (!ctxMenuStrictRunning) return
               openFilesWindow(ctxMenu.containerId)
               setCtxMenu(null)
             }}
@@ -1111,7 +1304,7 @@ export function ContainersView() {
             type="button"
             role="menuitem"
             title={t('containers.contextConfigInPlaceHint')}
-            className={`block w-full px-3 py-2 text-left hover:bg-zinc-100 dark:hover:bg-zinc-800 ${ctxMenuIndex === 2 ? 'bg-zinc-100 dark:bg-zinc-800' : ''}`}
+            className={`block w-full px-3 py-2 text-left enabled:hover:bg-zinc-100 dark:enabled:hover:bg-zinc-800 ${ctxMenuIndex === 2 ? 'bg-zinc-100 dark:bg-zinc-800' : ''}`}
             onMouseEnter={() => {
               ctxMenuIndexRef.current = 2
               setCtxMenuIndex(2)
@@ -1127,7 +1320,7 @@ export function ContainersView() {
             type="button"
             role="menuitem"
             title={t('containers.contextConfigRecreateHint')}
-            className={`block w-full px-3 py-2 text-left hover:bg-zinc-100 dark:hover:bg-zinc-800 ${ctxMenuIndex === 3 ? 'bg-zinc-100 dark:bg-zinc-800' : ''}`}
+            className={`block w-full px-3 py-2 text-left enabled:hover:bg-zinc-100 dark:enabled:hover:bg-zinc-800 ${ctxMenuIndex === 3 ? 'bg-zinc-100 dark:bg-zinc-800' : ''}`}
             onMouseEnter={() => {
               ctxMenuIndexRef.current = 3
               setCtxMenuIndex(3)
@@ -1142,7 +1335,7 @@ export function ContainersView() {
           <button
             type="button"
             role="menuitem"
-            className={`block w-full px-3 py-2 text-left hover:bg-zinc-100 dark:hover:bg-zinc-800 ${ctxMenuIndex === 4 ? 'bg-zinc-100 dark:bg-zinc-800' : ''}`}
+            className={`block w-full px-3 py-2 text-left enabled:hover:bg-zinc-100 dark:enabled:hover:bg-zinc-800 ${ctxMenuIndex === 4 ? 'bg-zinc-100 dark:bg-zinc-800' : ''}`}
             onMouseEnter={() => {
               ctxMenuIndexRef.current = 4
               setCtxMenuIndex(4)
@@ -1157,12 +1350,15 @@ export function ContainersView() {
           <button
             type="button"
             role="menuitem"
-            className={`block w-full px-3 py-2 text-left hover:bg-zinc-100 dark:hover:bg-zinc-800 ${ctxMenuIndex === 5 ? 'bg-zinc-100 dark:bg-zinc-800' : ''}`}
+            disabled={!ctxMenuStrictRunning}
+            title={!ctxMenuStrictRunning ? t('containers.hintNeedsRunning') : undefined}
+            className={`block w-full px-3 py-2 text-left enabled:hover:bg-zinc-100 dark:enabled:hover:bg-zinc-800 ${ctxMenuIndex === 5 ? 'bg-zinc-100 dark:bg-zinc-800' : ''} ${BTN_DISABLED}`}
             onMouseEnter={() => {
               ctxMenuIndexRef.current = 5
               setCtxMenuIndex(5)
             }}
             onClick={() => {
+              if (!ctxMenuStrictRunning) return
               void openStats(ctxMenu.containerId)
               setCtxMenu(null)
             }}

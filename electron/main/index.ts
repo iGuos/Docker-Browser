@@ -2,14 +2,15 @@ import { app, BrowserWindow, ipcMain, shell } from 'electron'
 import type { AppLanguage } from '../../shared/locale'
 import type { ThemePreference } from '../../shared/theme'
 import { ipcErr, ipcOk, type IpcResult } from '../../shared/ipc'
+import type { HostMetrics } from '../../shared/hostMetrics'
 import { spawnSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
-import os from 'node:os'
-import { installAppMenu, syncNativeThemeSource } from './appMenu'
+import os, { type CpuInfo } from 'node:os'
+import { installAppMenu, rebuildApplicationMenu, syncNativeThemeSource } from './appMenu'
 import { openExternalUrlIfAllowed } from './openExternalPolicy'
 import { registerDockerIpc } from './ipcDocker'
-import { registerAppUpdaterIpc, scheduleStartupUpdateCheck } from './updater'
+import { registerAppUpdaterIpc, scheduleStartupUpdateCheck, setUpdaterMenuRefresh } from './updater'
 
 registerDockerIpc()
 registerAppUpdaterIpc()
@@ -31,6 +32,61 @@ ipcMain.handle('app:open-path', async (_evt, rawPath: unknown): Promise<IpcResul
     const err = await shell.openPath(p)
     if (err) return ipcErr(err)
     return ipcOk(undefined)
+  } catch (e) {
+    return ipcErr(e instanceof Error ? e.message : String(e))
+  }
+})
+
+function sumCpuTimes(c: CpuInfo): number {
+  const t = c.times
+  return t.user + t.nice + t.sys + t.irq + t.idle
+}
+
+function sampleCpuUsagePercent(delayMs: number): Promise<number> {
+  const cpus1 = os.cpus()
+  const idle1 = cpus1.reduce((a, c) => a + c.times.idle, 0)
+  const total1 = cpus1.reduce((a, c) => a + sumCpuTimes(c), 0)
+  return new Promise((resolve) => {
+    setTimeout(() => {
+      const cpus2 = os.cpus()
+      const idle2 = cpus2.reduce((a, c) => a + c.times.idle, 0)
+      const total2 = cpus2.reduce((a, c) => a + sumCpuTimes(c), 0)
+      const idleDelta = idle2 - idle1
+      const totalDelta = total2 - total1
+      if (totalDelta <= 0) {
+        resolve(0)
+        return
+      }
+      const pct = Math.round(100 * (1 - idleDelta / totalDelta))
+      resolve(Math.min(100, Math.max(0, pct)))
+    }, delayMs)
+  })
+}
+
+ipcMain.handle('app:get-host-metrics', async (): Promise<IpcResult<HostMetrics>> => {
+  try {
+    const total = os.totalmem()
+    const free = os.freemem()
+    const usedPct = total > 0 ? Math.round(100 * (1 - free / total)) : 0
+    const cpus = os.cpus()
+    const cpuUsagePercent = await sampleCpuUsagePercent(100)
+    const la = os.loadavg()
+    const loadavg: [number, number, number] | null =
+      os.platform() === 'win32' ? null : [la[0] ?? 0, la[1] ?? 0, la[2] ?? 0]
+    const payload: HostMetrics = {
+      hostname: os.hostname(),
+      platform: os.platform(),
+      arch: os.arch(),
+      uptimeSec: Math.floor(os.uptime()),
+      cpus: cpus.length,
+      cpuModel: cpus[0]?.model?.trim() || '—',
+      cpuUsagePercent,
+      memTotalBytes: total,
+      memFreeBytes: free,
+      memUsedPercent: Math.min(100, Math.max(0, usedPct)),
+      loadavg,
+    }
+    return ipcOk(payload)
   } catch (e) {
     return ipcErr(e instanceof Error ? e.message : String(e))
   }
@@ -206,6 +262,7 @@ async function createWindow() {
 }
 
 app.whenReady().then(() => {
+  setUpdaterMenuRefresh(() => rebuildApplicationMenu())
   installAppMenu()
   scheduleStartupUpdateCheck()
   createWindow()

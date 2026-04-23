@@ -131,54 +131,66 @@ export function NetworksView() {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden p-4">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <h2 className="text-sm font-semibold">{t('networks.title')}</h2>
-        <div className="flex flex-wrap gap-2">
+      <div className="flex shrink-0 flex-col gap-2">
+        <div>
+          <h2 className="text-sm font-semibold">{t('networks.title')}</h2>
+          <p className="mt-0.5 text-[10px] leading-snug text-zinc-500 dark:text-zinc-400">{t('networks.selectionHint')}</p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <input
+            value={netName}
+            onChange={(e) => setNetName(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key !== 'Enter') return
+              if (busy || !netName.trim()) return
+              e.preventDefault()
+              onCreate()
+            }}
+            placeholder={t('networks.createName')}
+            title={t('networks.createName')}
+            aria-label={t('networks.createNameAria')}
+            className="w-48 rounded-md border border-zinc-300 bg-white px-2 py-1 text-[11px] dark:border-zinc-600 dark:bg-zinc-900"
+          />
+          <input
+            value={netDriver}
+            onChange={(e) => setNetDriver(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key !== 'Enter') return
+              if (busy || !netName.trim()) return
+              e.preventDefault()
+              onCreate()
+            }}
+            placeholder={t('networks.createDriver')}
+            title={t('networks.createDriver')}
+            aria-label={t('networks.createDriverAria')}
+            className="w-32 shrink-0 rounded-md border border-zinc-300 bg-white px-2 py-1 font-mono text-[11px] dark:border-zinc-600 dark:bg-zinc-900"
+          />
+          <button
+            type="button"
+            disabled={busy || !netName.trim()}
+            onClick={() => void onCreate()}
+            className="rounded-md bg-emerald-600 px-2 py-1 text-[11px] font-semibold text-white hover:bg-emerald-500 disabled:pointer-events-none disabled:opacity-40"
+          >
+            {t('networks.createSubmit')}
+          </button>
           <button
             type="button"
             disabled={checkedIds.size === 0 || busy}
             onClick={() => void onRemoveSelected()}
-            className="rounded-md border border-rose-400 px-2 py-1 text-[11px] text-rose-800 dark:border-rose-800 dark:text-rose-200"
+            className="rounded-md border border-rose-400 px-2 py-1 text-[11px] text-rose-800 hover:bg-rose-50 disabled:pointer-events-none disabled:opacity-40 dark:border-rose-800 dark:text-rose-200 dark:hover:bg-rose-950/30"
           >
             {t('networks.removeSelected')}
           </button>
         </div>
       </div>
-      <p className="text-[10px] leading-snug text-zinc-500 dark:text-zinc-400">{t('networks.selectionHint')}</p>
-      <div className="flex flex-wrap items-end gap-2 rounded-lg border border-zinc-200/70 bg-zinc-50/80 p-2 text-[11px] dark:border-white/[0.06] dark:bg-zinc-900/50">
-        <span className="font-medium text-zinc-700 dark:text-zinc-300">{t('networks.create')}</span>
-        <label className="flex flex-col gap-0.5">
-          <span className="text-[10px] text-zinc-500">{t('networks.createName')}</span>
-          <input
-            value={netName}
-            onChange={(e) => setNetName(e.target.value)}
-            className="w-40 rounded border border-zinc-300 bg-white px-2 py-1 dark:border-zinc-600 dark:bg-zinc-950"
-          />
-        </label>
-        <label className="flex flex-col gap-0.5">
-          <span className="text-[10px] text-zinc-500">{t('networks.createDriver')}</span>
-          <input
-            value={netDriver}
-            onChange={(e) => setNetDriver(e.target.value)}
-            className="w-32 rounded border border-zinc-300 bg-white px-2 py-1 dark:border-zinc-600 dark:bg-zinc-950"
-          />
-        </label>
-        <button
-          type="button"
-          disabled={busy || !netName.trim()}
-          onClick={() => void onCreate()}
-          className="rounded-md bg-emerald-600 px-2 py-1 font-semibold text-white hover:bg-emerald-500 disabled:opacity-40"
-        >
-          {t('networks.createSubmit')}
-        </button>
-      </div>
       {sel ? (
-        <div className="flex flex-wrap items-end gap-2 rounded-lg border border-sky-200/70 bg-sky-50/50 p-2 text-[11px] dark:border-sky-900/40 dark:bg-sky-950/20">
-          <span className="font-medium text-zinc-700 dark:text-zinc-300">{t('networks.connect')}</span>
+        <div className="flex min-w-0 shrink-0 flex-nowrap items-center gap-x-2 gap-y-1 overflow-x-auto rounded-lg border border-zinc-200/70 bg-zinc-50/80 px-2 py-1.5 text-[11px] dark:border-white/[0.06] dark:bg-zinc-900/50">
+          <span className="shrink-0 whitespace-nowrap text-zinc-500 dark:text-zinc-400">{t('networks.connect')}</span>
           <select
             value={connectCid}
             onChange={(e) => setConnectCid(e.target.value)}
-            className="max-w-xs rounded border border-zinc-300 bg-white px-2 py-1 font-mono text-[10px] dark:border-zinc-600 dark:bg-zinc-950"
+            aria-label={t('networks.connectSelectAria')}
+            className="max-w-[min(42vw,14rem)] shrink-0 rounded-md border border-zinc-300 bg-white px-2 py-1 font-mono text-[10px] dark:border-zinc-600 dark:bg-zinc-950"
           >
             <option value="">{t('networks.connectPick')}</option>
             {containers.map((c) => (
@@ -187,11 +199,12 @@ export function NetworksView() {
               </option>
             ))}
           </select>
+          <span className="min-w-0 flex-1" aria-hidden />
           <button
             type="button"
             disabled={busy || !connectCid}
             onClick={() => void onConnect()}
-            className="rounded-md bg-sky-600 px-2 py-1 font-semibold text-white hover:bg-sky-500 disabled:opacity-40"
+            className="shrink-0 rounded-md bg-sky-600 px-2 py-1 text-[11px] font-semibold text-white hover:bg-sky-500 disabled:pointer-events-none disabled:opacity-40"
           >
             {t('networks.connectRun')}
           </button>
@@ -206,6 +219,7 @@ export function NetworksView() {
                   ref={headerCheckboxRef}
                   type="checkbox"
                   className="align-middle"
+                  disabled={networks.length === 0}
                   checked={allSelected}
                   onChange={toggleSelectAll}
                   title={t('common.selectAll')}
@@ -227,39 +241,50 @@ export function NetworksView() {
             </tr>
           </thead>
           <tbody>
-            {networks.map((n) => {
-              const active = n.Id === selectedNetworkId
-              const checked = checkedIds.has(n.Id)
-              return (
-                <tr
-                  key={n.Id}
-                  onClick={() => setSelectedNetworkId(n.Id)}
-                  className={`cursor-pointer border-b border-zinc-100 hover:bg-sky-500/5 dark:border-zinc-800/80 dark:hover:bg-sky-500/10 ${
-                    active ? 'bg-sky-500/10 dark:bg-sky-500/15' : ''
-                  }`}
+            {networks.length === 0 ? (
+              <tr>
+                <td
+                  colSpan={5}
+                  className="px-3 py-10 text-center text-[11px] leading-relaxed text-zinc-500 dark:text-zinc-400"
                 >
-                  <td className="px-1 py-1.5 align-middle" onClick={(e) => e.stopPropagation()}>
-                    <input
-                      type="checkbox"
-                      className="align-middle"
-                      checked={checked}
-                      onChange={(e) => {
-                        e.stopPropagation()
-                        toggleChecked(n.Id, e.target.checked)
-                      }}
-                      onClick={(e) => e.stopPropagation()}
-                      aria-label={n.Name ?? shortId(n.Id)}
-                    />
-                  </td>
-                  <td className="px-2 py-1.5 align-middle font-medium text-zinc-900 dark:text-zinc-100">
-                    {n.Name ?? '—'}
-                  </td>
-                  <td className="px-2 py-1.5 align-middle font-mono text-zinc-600 dark:text-zinc-400">{shortId(n.Id)}</td>
-                  <td className="px-2 py-1.5 align-middle">{n.Driver ?? '—'}</td>
-                  <td className="px-2 py-1.5 align-middle">{n.Scope ?? '—'}</td>
-                </tr>
-              )
-            })}
+                  {t('networks.emptyTable')}
+                </td>
+              </tr>
+            ) : (
+              networks.map((n) => {
+                const active = n.Id === selectedNetworkId
+                const checked = checkedIds.has(n.Id)
+                return (
+                  <tr
+                    key={n.Id}
+                    onClick={() => setSelectedNetworkId(n.Id)}
+                    className={`cursor-pointer border-b border-zinc-100 hover:bg-sky-500/5 dark:border-zinc-800/80 dark:hover:bg-sky-500/10 ${
+                      active ? 'bg-sky-500/10 dark:bg-sky-500/15' : ''
+                    }`}
+                  >
+                    <td className="px-1 py-1.5 align-middle" onClick={(e) => e.stopPropagation()}>
+                      <input
+                        type="checkbox"
+                        className="align-middle"
+                        checked={checked}
+                        onChange={(e) => {
+                          e.stopPropagation()
+                          toggleChecked(n.Id, e.target.checked)
+                        }}
+                        onClick={(e) => e.stopPropagation()}
+                        aria-label={n.Name ?? shortId(n.Id)}
+                      />
+                    </td>
+                    <td className="px-2 py-1.5 align-middle font-medium text-zinc-900 dark:text-zinc-100">
+                      {n.Name ?? '—'}
+                    </td>
+                    <td className="px-2 py-1.5 align-middle font-mono text-zinc-600 dark:text-zinc-400">{shortId(n.Id)}</td>
+                    <td className="px-2 py-1.5 align-middle">{n.Driver ?? '—'}</td>
+                    <td className="px-2 py-1.5 align-middle">{n.Scope ?? '—'}</td>
+                  </tr>
+                )
+              })
+            )}
           </tbody>
         </table>
       </div>

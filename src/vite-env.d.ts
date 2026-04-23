@@ -1,5 +1,7 @@
 /// <reference types="vite/client" />
 
+import type { HostMetrics } from '../shared/hostMetrics'
+import type { RunningContainersMemorySummary } from '../shared/dockerMemorySummary'
 import type { AppUpdateStatus } from '../shared/appUpdateStatus'
 import type { DockerEventChunk } from '../shared/dockerEvents'
 import type { DockerLogsChunk } from '../shared/dockerLogs'
@@ -105,6 +107,8 @@ export interface DockerDesktopApi {
   }): Promise<IpcResult<void>>
   volumeUsedBy(volumeName: string): Promise<IpcResult<{ containerIds: string[] }>>
   containerStatsOnce(containerId: string): Promise<IpcResult<unknown>>
+  runningContainersMemorySummary(): Promise<IpcResult<RunningContainersMemorySummary>>
+  containersMemoryUsage(containerIds: string[]): Promise<IpcResult<Record<string, number>>>
   imageHistory(name: string): Promise<IpcResult<unknown[]>>
   saveImageTar(payload: { name: string }): Promise<IpcResult<{ filePath: string }>>
   loadImageTar(): Promise<IpcResult<void>>
@@ -118,6 +122,7 @@ export interface DockerDesktopApi {
   reconnectDocker(): Promise<IpcResult<void>>
   getDockerRuntimeEnv(): Promise<IpcResult<{ dockerHost: string; dockerContext: string }>>
   getComposeVersion(): Promise<IpcResult<string>>
+  getHostMetrics(): Promise<IpcResult<HostMetrics>>
   openPathInExplorer(p: string): Promise<IpcResult<void>>
   onLogsChunk(handler: (msg: DockerLogsChunk) => void): () => void
   onEventsChunk(handler: (msg: DockerEventChunk) => void): () => void

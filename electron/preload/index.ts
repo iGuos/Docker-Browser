@@ -5,6 +5,8 @@ import type { IpcResult } from '../../shared/ipc'
 import type { DockerLogsChunk } from '../../shared/dockerLogs'
 import type { DockerEventChunk } from '../../shared/dockerEvents'
 import { AppIpc } from '../../shared/appIpcChannels'
+import type { HostMetrics } from '../../shared/hostMetrics'
+import type { RunningContainersMemorySummary } from '../../shared/dockerMemorySummary'
 import type { AppUpdateStatus } from '../../shared/appUpdateStatus'
 import { parseAppUpdateStatus } from '../../shared/appUpdateStatus'
 import { DockerIpc } from '../../shared/dockerIpcChannels'
@@ -191,6 +193,12 @@ contextBridge.exposeInMainWorld('dockerDesktop', {
   containerStatsOnce(containerId: string): Promise<IpcResult<unknown>> {
     return ipcRenderer.invoke(DockerIpc.containerStatsOnce, containerId)
   },
+  runningContainersMemorySummary(): Promise<IpcResult<RunningContainersMemorySummary>> {
+    return ipcRenderer.invoke(DockerIpc.runningContainersMemorySummary)
+  },
+  containersMemoryUsage(containerIds: string[]): Promise<IpcResult<Record<string, number>>> {
+    return ipcRenderer.invoke(DockerIpc.containersMemoryUsage, containerIds)
+  },
   imageHistory(name: string): Promise<IpcResult<unknown[]>> {
     return ipcRenderer.invoke(DockerIpc.imageHistory, name)
   },
@@ -219,6 +227,9 @@ contextBridge.exposeInMainWorld('dockerDesktop', {
   },
   getComposeVersion(): Promise<IpcResult<string>> {
     return ipcRenderer.invoke('app:get-compose-version')
+  },
+  getHostMetrics(): Promise<IpcResult<HostMetrics>> {
+    return ipcRenderer.invoke('app:get-host-metrics')
   },
   openPathInExplorer(p: string): Promise<IpcResult<void>> {
     return ipcRenderer.invoke('app:open-path', p)
