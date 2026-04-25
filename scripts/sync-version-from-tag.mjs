@@ -18,9 +18,24 @@ if (!raw) {
   process.exit(1)
 }
 
-const version = raw.startsWith('v') ? raw.slice(1) : raw
-if (!version) {
+const input = raw.startsWith('v') ? raw.slice(1) : raw
+if (!input) {
   console.error('sync-version-from-tag: 空版本')
+  process.exit(1)
+}
+
+/** 允许 v1 / v1.2 / v1.2.3，并规范化为合法 semver。 */
+function normalizeSemver(v) {
+  const s = v.trim()
+  if (/^\d+$/.test(s)) return `${s}.0.0`
+  if (/^\d+\.\d+$/.test(s)) return `${s}.0`
+  if (/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/.test(s)) return s
+  return null
+}
+
+const version = normalizeSemver(input)
+if (!version) {
+  console.error(`sync-version-from-tag: 非法版本 "${input}"，请使用 v1 / v1.2 / v1.2.3（可含 -rc.1 / +build）`)
   process.exit(1)
 }
 
