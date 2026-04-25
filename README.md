@@ -65,10 +65,11 @@ pnpm dist
 pnpm dist
 ```
 
+- Windows 打包前会自动执行 `scripts/gen-icon-ico.mjs`：从 `public/icon.png` 生成 `build/icon.ico`，供 `exe` / NSIS 安装向导嵌入（避免仅用 PNG 时资源管理器里图标异常）。
 - 输出目录由 `electron-builder.json` 的 `directories.output` 定义（默认：`release/<version>`）。
 - Windows 产物：NSIS 安装包（`.exe`）。
 - macOS 产物：`.dmg` 与 `.zip`（需在 macOS 环境构建）。
-- **Windows 本地打包**：`pnpm dist` 会为 Electron 重编 `node-pty`（`electron-rebuild`）。若提示找不到 Visual Studio / `node-gyp` 失败，请安装 **Visual Studio Build Tools**，并勾选 **「使用 C++ 的桌面开发」** 工作负载（与 [node-gyp Windows 说明](https://github.com/nodejs/node-gyp#on-windows) 一致）。GitHub Actions 的 `windows-latest` 镜像已自带该环境。
+- **Windows 本地打包**：`pnpm dist` 会为 Electron 重编 `node-pty`（`electron-rebuild`）。若提示 **Could not find any Visual Studio** / `node-gyp` 失败，请安装 **Visual Studio Build Tools**，并勾选 **「使用 C++ 的桌面开发」** 工作负载（与 [node-gyp Windows 说明](https://github.com/nodejs/node-gyp#on-windows) 一致）。GitHub Actions 的 `windows-latest` 镜像已自带该环境。
 - **依赖锁定**：`package.json` 的 `pnpm.overrides` 将 `builder-util-runtime` 固定为 `9.5.1`，降低 electron-builder 传递依赖版本漂移风险。完整清理重打包可用 `pnpm rebuild`（等同 `pnpm clean && pnpm dist`）。
 
 ### macOS：无法安装或提示「已损坏」

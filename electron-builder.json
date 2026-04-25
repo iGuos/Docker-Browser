@@ -16,6 +16,7 @@
     "target": ["dmg", "zip"]
   },
   "win": {
+    "icon": "build/icon.ico",
     "signAndEditExecutable": false,
     "signDlls": false,
     "target": [{ "target": "nsis", "arch": ["x64"] }],
@@ -24,7 +25,9 @@
   "nsis": {
     "oneClick": false,
     "perMachine": false,
-    "allowToChangeInstallationDirectory": true
+    "allowToChangeInstallationDirectory": true,
+    "installerIcon": "build/icon.ico",
+    "uninstallerIcon": "build/icon.ico"
   },
   "publish": {
     "provider": "github",
