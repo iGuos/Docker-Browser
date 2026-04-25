@@ -137,6 +137,7 @@
     "portsNone": "No published or exposed ports",
     "columns": "Columns",
     "columnsMenu": "Show columns…",
+    "rowContextMenu": "Row actions (same as right-click)",
     "col_name": "Name",
     "col_id": "ID",
     "col_image": "Image",

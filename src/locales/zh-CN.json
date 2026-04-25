@@ -137,6 +137,7 @@
     "portsNone": "无端口映射或暴露",
     "columns": "列",
     "columnsMenu": "列显示…",
+    "rowContextMenu": "行操作（与右键相同）",
     "col_name": "名称",
     "col_id": "ID",
     "col_image": "镜像",

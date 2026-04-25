@@ -4,6 +4,7 @@ import {
   useMemo,
   useRef,
   useState,
+  type MouseEvent as ReactMouseEvent,
   type PointerEvent as ReactPointerEvent,
   type ReactNode,
 } from 'react'
@@ -180,7 +181,13 @@ export function ContainersView() {
   const [collapsedProjectKeys, setCollapsedProjectKeys] = useState<Set<string>>(() => new Set())
   const ctxMenuRef = useRef<HTMLDivElement>(null)
   const ctxMenuIndexRef = useRef(0)
-  const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; containerId: string } | null>(null)
+  const [ctxMenu, setCtxMenu] = useState<{
+    x: number
+    y: number
+    containerId: string
+    /** 行内 ⋯ 打开：居中对齐按钮并收紧与按钮的距离 */
+    tight?: boolean
+  } | null>(null)
   const [ctxMenuIndex, setCtxMenuIndex] = useState(0)
   const [runtimeConfigContainerId, setRuntimeConfigContainerId] = useState<string | null>(null)
   const [recreateConfigContainerId, setRecreateConfigContainerId] = useState<string | null>(null)
@@ -424,6 +431,31 @@ export function ContainersView() {
     })
   }, [alert, t])
 
+  const openContainerRowContextMenu = useCallback((e: ReactMouseEvent<HTMLButtonElement>, containerId: string) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setSelectedContainerId(containerId)
+    const btn = e.currentTarget as HTMLElement
+    const r = btn.getBoundingClientRect()
+    const menuW = 220
+    // 7 行菜单约高（勿用过大的占位高度，否则「向上」时 y=r.top-300 会离按钮很远）
+    const estMenuH = 232
+    const pad = 4
+    const overlap = 2
+    // 水平：以 ⋯ 按钮中心为锚居中展开，避免宽菜单看起来离小按钮「橫向很远」
+    const cx = r.left + r.width / 2
+    let x = Math.round(cx - menuW / 2)
+    if (x < pad) x = pad
+    if (x + menuW > window.innerWidth - pad) x = window.innerWidth - menuW - pad
+    // 垂直：下方时上沿与按钮下缘交叠 2px；改到「上方」时**下缘**与按钮**上**缘交叠 2px（与下方对称，避免悬在半空）
+    let y = Math.floor(r.bottom) - overlap
+    if (y + estMenuH > window.innerHeight - pad) {
+      y = Math.floor(r.top) - estMenuH + overlap
+    }
+    y = Math.max(pad, y)
+    setCtxMenu({ x, y, containerId, tight: true })
+  }, [])
+
   useEffect(() => {
     if (!ctxMenu) return
     setCtxMenuIndex(0)
@@ -577,7 +609,7 @@ export function ContainersView() {
 
   const visibleCols = ALL_CONTAINER_COLS.filter((c) => colVis[c])
   /** 首列复选框 + 次列展开；数据列用 fr 按 colWidths 比例分配宽度，总宽始终贴满容器，避免横向滚动条 */
-  const gridTemplate = `28px 22px ${visibleCols.map((id) => `minmax(0, ${colWidths[id]}fr)`).join(' ')} 2rem`
+  const gridTemplate = `28px 22px ${visibleCols.map((id) => `minmax(0, ${colWidths[id]}fr)`).join(' ')} 2.25rem 2rem`
 
   /** 仅改变 `id` 对应列的 `colWidths[id]`，其它列宽度不变（在 window 上跟指针，避免表头/sticky 丢事件） */
   const startColResize = useCallback((id: ContainerTableColId, e: ReactPointerEvent<HTMLDivElement>) => {
@@ -770,6 +802,21 @@ export function ContainersView() {
         <div className="min-w-0" aria-hidden />
         {cells}
         <div className="min-w-0 border-b border-zinc-100 dark:border-zinc-800/80" aria-hidden />
+        <div
+          className="relative flex items-center justify-center border-b border-zinc-100 py-0.5 dark:border-zinc-800/80"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <button
+            type="button"
+            className="flex h-7 w-7 shrink-0 items-center justify-center rounded text-base leading-none text-zinc-500 hover:bg-zinc-200/80 hover:text-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-100"
+            title={t('containers.rowContextMenu')}
+            aria-label={t('containers.rowContextMenu')}
+            aria-haspopup="menu"
+            onClick={(e) => openContainerRowContextMenu(e, c.Id)}
+          >
+            ⋯
+          </button>
+        </div>
       </div>
     )
   }
@@ -952,6 +999,7 @@ export function ContainersView() {
           {renderHeaderCell('status', t('common.status'))}
           {renderHeaderCell('memory', t('containers.col_memory'))}
           {renderHeaderCell('health', t('containers.healthCol'))}
+          <div className="border-b border-zinc-200 dark:border-zinc-800" aria-hidden />
           <div
             ref={colsMenuWrapRef}
             className="relative flex items-center justify-center border-b border-zinc-200 py-1 dark:border-zinc-800"
@@ -1043,7 +1091,7 @@ export function ContainersView() {
                       {open ? '▼' : '▶'}
                     </button>
                   </div>
-                  <div className="flex min-h-0 min-w-0 items-center gap-2 px-2 py-1.5" style={{ gridColumn: '3 / -2' }}>
+                  <div className="flex min-h-0 min-w-0 items-center gap-2 px-2 py-1.5" style={{ gridColumn: '3 / -3' }}>
                     <button
                       type="button"
                       className="flex min-w-0 flex-1 items-center gap-2 truncate text-left font-semibold"
@@ -1064,6 +1112,7 @@ export function ContainersView() {
                       </button>
                     ) : null}
                   </div>
+                  <div className="min-w-0 border-b border-zinc-200 dark:border-zinc-700" aria-hidden />
                   <div className="min-w-0" aria-hidden />
                 </div>
               )
@@ -1158,7 +1207,9 @@ export function ContainersView() {
         <div
           ref={ctxMenuRef}
           role="menu"
-          className="fixed z-[100] min-w-[11rem] rounded-md border border-zinc-200 bg-white py-1 text-[11px] shadow-lg dark:border-zinc-600 dark:bg-zinc-900"
+          className={`fixed z-[100] min-w-[11rem] rounded-md border border-zinc-200 bg-white py-1 text-[11px] shadow-lg dark:border-zinc-600 dark:bg-zinc-900 ${
+            ctxMenu.tight ? '-translate-y-px' : ''
+          }`}
           style={{ left: ctxMenu.x, top: ctxMenu.y }}
           onMouseDown={(e) => e.stopPropagation()}
         >

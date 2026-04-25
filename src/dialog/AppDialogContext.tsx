@@ -10,17 +10,20 @@ import {
   type ReactNode,
 } from 'react'
 import { useTranslation } from 'react-i18next'
+import type { AppAlertOptions } from '@/lib/alertMessage'
 
 type Visual =
-  | { kind: 'alert'; message: string }
+  | { kind: 'alert'; message: string; copyable?: boolean }
   | { kind: 'confirm'; message: string }
 
 type Pending =
   | { kind: 'alert'; resolve: () => void }
   | { kind: 'confirm'; resolve: (ok: boolean) => void }
 
+export type { AppAlertOptions }
+
 export type AppDialogApi = {
-  alert: (message: string) => Promise<void>
+  alert: (message: string, options?: AppAlertOptions) => Promise<void>
   confirm: (message: string) => Promise<boolean>
 }
 
@@ -38,6 +41,7 @@ export function AppDialogProvider({ children }: { children: ReactNode }) {
   const pendingRef = useRef<Pending | null>(null)
   const panelRef = useRef<HTMLDivElement>(null)
   const primaryBtnRef = useRef<HTMLButtonElement>(null)
+  const copyableTextareaRef = useRef<HTMLTextAreaElement>(null)
 
   const finish = useCallback((result?: boolean) => {
     const p = pendingRef.current
@@ -51,7 +55,8 @@ export function AppDialogProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!visual) return
     const id = window.requestAnimationFrame(() => {
-      primaryBtnRef.current?.focus()
+      if (visual.kind === 'alert' && visual.copyable) copyableTextareaRef.current?.focus()
+      else primaryBtnRef.current?.focus()
     })
     return () => window.cancelAnimationFrame(id)
   }, [visual])
@@ -93,10 +98,10 @@ export function AppDialogProvider({ children }: { children: ReactNode }) {
     [],
   )
 
-  const alert = useCallback((message: string) => {
+  const alert = useCallback((message: string, options?: AppAlertOptions) => {
     return new Promise<void>((resolve) => {
       pendingRef.current = { kind: 'alert', resolve }
-      setVisual({ kind: 'alert', message })
+      setVisual({ kind: 'alert', message, copyable: options?.copyable })
     })
   }, [])
 
@@ -124,7 +129,11 @@ export function AppDialogProvider({ children }: { children: ReactNode }) {
             aria-modal="true"
             aria-labelledby="app-dialog-title"
             aria-describedby="app-dialog-desc"
-            className="w-full max-w-md rounded-xl border border-zinc-200 bg-white p-4 shadow-xl outline-none dark:border-zinc-700 dark:bg-zinc-900"
+            className={
+              visual.kind === 'alert' && visual.copyable
+                ? 'w-full max-w-2xl rounded-xl border border-zinc-200 bg-white p-4 shadow-xl outline-none dark:border-zinc-700 dark:bg-zinc-900'
+                : 'w-full max-w-md rounded-xl border border-zinc-200 bg-white p-4 shadow-xl outline-none dark:border-zinc-700 dark:bg-zinc-900'
+            }
             onClick={(e) => e.stopPropagation()}
             onKeyDown={trapTab}
           >
@@ -134,12 +143,24 @@ export function AppDialogProvider({ children }: { children: ReactNode }) {
             >
               {visual.kind === 'confirm' ? t('common.dialogConfirmTitle') : t('common.dialogNoticeTitle')}
             </h2>
-            <p
-              id="app-dialog-desc"
-              className="max-h-[50vh] overflow-auto whitespace-pre-wrap break-words text-[11px] leading-relaxed text-zinc-700 dark:text-zinc-300"
-            >
-              {visual.message}
-            </p>
+            {visual.kind === 'alert' && visual.copyable ? (
+              <textarea
+                ref={copyableTextareaRef}
+                id="app-dialog-desc"
+                readOnly
+                value={visual.message}
+                rows={8}
+                spellCheck={false}
+                className="max-h-[50vh] min-h-[5.5rem] w-full resize-y select-text rounded-md border border-zinc-200 bg-zinc-50 px-2 py-1.5 font-mono text-[11px] leading-relaxed text-zinc-800 outline-none dark:border-zinc-600 dark:bg-zinc-950 dark:text-zinc-200"
+              />
+            ) : (
+              <p
+                id="app-dialog-desc"
+                className="max-h-[50vh] overflow-auto whitespace-pre-wrap break-words text-[11px] leading-relaxed text-zinc-700 select-text dark:text-zinc-300"
+              >
+                {visual.message}
+              </p>
+            )}
             <div className="mt-4 flex justify-end gap-2">
               {visual.kind === 'confirm' ? (
                 <button

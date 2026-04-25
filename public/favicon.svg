@@ -1,17 +1,49 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none" aria-hidden="true">
+  <title>Docker Browser</title>
   <defs>
-    <linearGradient id="g" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#22d3ee"/>
-      <stop offset="100%" stop-color="#14b8a6"/>
+    <linearGradient id="db-frame" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#38bdf8"/>
+      <stop offset="0.5" stop-color="#2dd4bf"/>
+      <stop offset="1" stop-color="#22c55e"/>
+    </linearGradient>
+    <linearGradient id="db-chrome" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#1e293b"/>
+      <stop offset="1" stop-color="#0f172a"/>
+    </linearGradient>
+    <linearGradient id="db-stack" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#22d3ee"/>
+      <stop offset="0.5" stop-color="#14b8a6"/>
+      <stop offset="1" stop-color="#4ade80"/>
     </linearGradient>
   </defs>
-  <rect width="512" height="512" rx="112" fill="#0c0c0e"/>
-  <rect x="88" y="120" width="336" height="272" rx="28" stroke="url(#g)" stroke-width="20"/>
-  <line x1="120" y1="168" x2="392" y2="168" stroke="url(#g)" stroke-width="12" stroke-linecap="round" opacity="0.35"/>
-  <circle cx="148" cy="148" r="10" fill="#22d3ee"/>
-  <circle cx="188" cy="148" r="10" fill="#14b8a6" opacity="0.7"/>
-  <circle cx="256" cy="268" r="28" fill="#22d3ee"/>
-  <circle cx="176" cy="328" r="22" fill="#14b8a6"/>
-  <circle cx="336" cy="328" r="22" fill="#14b8a6"/>
-  <path d="M256 296v-20M234 308l-42 12M278 308l42 12" stroke="url(#g)" stroke-width="14" stroke-linecap="round"/>
+  <rect width="512" height="512" rx="108" fill="#020617"/>
+  <rect x="1" y="1" width="510" height="510" rx="107" stroke="url(#db-frame)" stroke-width="2" opacity="0.92"/>
+  <!-- 窗口顶栏 + 控制点 -->
+  <rect x="64" y="68" width="384" height="128" rx="32" fill="url(#db-chrome)" stroke="url(#db-frame)" stroke-width="2.5"/>
+  <circle cx="112" cy="132" r="13" fill="#f43f5e"/>
+  <circle cx="168" cy="132" r="13" fill="#f59e0b"/>
+  <circle cx="224" cy="132" r="13" fill="#22c55e"/>
+  <rect x="268" y="114" width="160" height="36" rx="10" fill="#020617" stroke="#334155" stroke-width="1.2"/>
+  <path
+    d="M288 132h120"
+    stroke="url(#db-frame)"
+    stroke-width="2.2"
+    stroke-linecap="round"
+    opacity="0.4"
+  />
+  <!-- 三叠“容器”层 -->
+  <rect x="64" y="224" width="384" height="64" rx="16" fill="url(#db-stack)" opacity="0.2"/>
+  <rect x="64" y="224" width="384" height="64" rx="16" stroke="url(#db-frame)" stroke-width="2.4"/>
+  <rect x="80" y="304" width="352" height="64" rx="16" fill="url(#db-stack)" opacity="0.32"/>
+  <rect x="80" y="304" width="352" height="64" rx="16" stroke="url(#db-frame)" stroke-width="2.4" opacity="0.95"/>
+  <rect x="96" y="384" width="320" height="56" rx="14" fill="url(#db-stack)" opacity="0.5"/>
+  <rect x="96" y="384" width="320" height="56" rx="14" stroke="url(#db-frame)" stroke-width="2.4"/>
+  <!-- 连接弧线：本机与引擎 -->
+  <path
+    d="M96 212 C 96 196 200 200 256 200 C 320 200 416 196 416 212"
+    stroke="url(#db-frame)"
+    stroke-width="2.5"
+    stroke-linecap="round"
+    opacity="0.28"
+  />
 </svg>

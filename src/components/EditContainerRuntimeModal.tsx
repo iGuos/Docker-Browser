@@ -101,7 +101,7 @@ export function EditContainerRuntimeModal({ open, containerId, onClose, onSaved 
       onClose()
     } catch (e) {
       const text = formatThrownEngineError(t, e)
-      if (text) await alert(text)
+      if (text) await alert(text, { copyable: true })
     } finally {
       setSubmitting(false)
     }

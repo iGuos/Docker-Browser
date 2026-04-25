@@ -50,6 +50,14 @@ export function HeaderBar() {
   return (
     <header className="flex shrink-0 items-center justify-between gap-3 border-b border-zinc-200/80 bg-white/70 px-4 py-2.5 backdrop-blur dark:border-white/[0.06] dark:bg-zinc-950/70">
       <div className="flex min-w-0 flex-1 items-center gap-2 sm:gap-3">
+        <img
+          src="/favicon.svg"
+          alt=""
+          width={28}
+          height={28}
+          className="h-7 w-7 shrink-0 rounded-lg border border-zinc-200/90 bg-zinc-900/5 shadow-sm dark:border-zinc-700/80 dark:bg-zinc-900/40"
+          decoding="async"
+        />
         <h1 className="truncate text-sm font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">
           {t('app.title')}
         </h1>

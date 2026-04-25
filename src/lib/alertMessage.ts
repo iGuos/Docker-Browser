@@ -12,11 +12,14 @@ export function formatThrownEngineError(t: TFunction, err: unknown): string | nu
   return formatEngineError(t, msg)
 }
 
+export type AppAlertOptions = { copyable?: boolean }
+
 export async function alertEngineError(
-  alert: (msg: string) => Promise<void>,
+  alert: (msg: string, options?: AppAlertOptions) => Promise<void>,
   t: TFunction,
   message: string,
+  options?: AppAlertOptions,
 ): Promise<void> {
   const text = formatEngineError(t, message)
-  if (text) await alert(text)
+  if (text) await alert(text, options)
 }

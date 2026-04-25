@@ -79,7 +79,7 @@ export function EditContainerConfigModal({ open, containerId, onClose, onRecreat
       onClose()
     } catch (e) {
       const text = formatThrownEngineError(t, e)
-      if (text) await alert(text)
+      if (text) await alert(text, { copyable: true })
     } finally {
       setSubmitting(false)
     }
