@@ -29,9 +29,15 @@ importers:
       fs-extra:
         specifier: ^11.3.4
         version: 11.3.4
+      graceful-fs:
+        specifier: ^4.2.11
+        version: 4.2.11
       i18next:
         specifier: ^26.0.3
         version: 26.0.6(typescript@5.9.3)
+      jsonfile:
+        specifier: ^6.2.1
+        version: 6.2.1
       node-pty:
         specifier: ^1.1.0
         version: 1.1.0
@@ -41,6 +47,9 @@ importers:
       tar-stream:
         specifier: ^3.1.8
         version: 3.1.8
+      universalify:
+        specifier: ^2.0.1
+        version: 2.0.1
       zustand:
         specifier: ^5.0.12
         version: 5.0.12(@types/react@18.3.28)(react@18.3.1)(use-sync-external-store@1.6.0(react@18.3.1))

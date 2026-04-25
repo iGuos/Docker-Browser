@@ -44,10 +44,13 @@
     "dockerode": "^4.0.2",
     "electron-updater": "^6.3.9",
     "fs-extra": "^11.3.4",
+    "graceful-fs": "^4.2.11",
     "i18next": "^26.0.3",
+    "jsonfile": "^6.2.1",
     "node-pty": "^1.1.0",
     "react-i18next": "^17.0.2",
     "tar-stream": "^3.1.8",
+    "universalify": "^2.0.1",
     "zustand": "^5.0.12"
   },
   "devDependencies": {
