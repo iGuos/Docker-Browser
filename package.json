@@ -38,10 +38,14 @@
     "icon:render": "node scripts/render-icon.mjs"
   },
   "dependencies": {
+    "@balena/dockerignore": "^1.0.2",
+    "@grpc/grpc-js": "^1.14.3",
+    "@grpc/proto-loader": "^0.8.0",
     "@tanstack/react-virtual": "^3.13.24",
     "@xterm/addon-fit": "^0.11.0",
     "@xterm/xterm": "^6.0.0",
     "builder-util-runtime": "9.5.1",
+    "docker-modem": "^5.0.7",
     "dockerode": "^4.0.2",
     "electron-updater": "^6.3.9",
     "fs-extra": "^11.3.4",
@@ -49,9 +53,12 @@
     "i18next": "^26.0.3",
     "jsonfile": "^6.2.1",
     "node-pty": "^1.1.0",
+    "protobufjs": "^8.0.1",
     "react-i18next": "^17.0.2",
+    "tar-fs": "^3.1.2",
     "tar-stream": "^3.1.8",
     "universalify": "^2.0.1",
+    "uuid": "^14.0.0",
     "zustand": "^5.0.12"
   },
   "devDependencies": {
