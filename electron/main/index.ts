@@ -190,10 +190,10 @@ ipcMain.handle('app:open-container-logs-window', (_evt, containerId: unknown) =>
 function createExecWindow(containerId: string) {
   const execWin = new BrowserWindow({
     title: 'Docker Browser',
-    width: 920,
-    height: 640,
-    minWidth: 400,
-    minHeight: 280,
+    width: 960,
+    height: 720,
+    minWidth: 520,
+    minHeight: 360,
     autoHideMenuBar: true,
     icon: path.join(process.env.VITE_PUBLIC ?? '', 'icon.png'),
     webPreferences: {
