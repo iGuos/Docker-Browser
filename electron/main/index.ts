@@ -143,21 +143,27 @@ function canStartDockerEngine(): boolean {
   return false
 }
 
+async function isEngineReachable(timeoutMs = 3000): Promise<boolean> {
+  try {
+    await Promise.race([
+      getDocker().ping(),
+      new Promise((_, reject) => {
+        setTimeout(() => reject(new Error('docker ping timeout')), timeoutMs)
+      }),
+    ])
+    return true
+  } catch {
+    return false
+  }
+}
+
 ipcMain.handle(
   'app:get-docker-bootstrap-status',
   async (): Promise<
     IpcResult<{ dockerInstalled: boolean; engineReachable: boolean; canStartEngine: boolean }>
   > => {
     const dockerInstalled = dockerCliInstalled()
-    let engineReachable = false
-    if (dockerInstalled) {
-      try {
-        await getDocker().ping()
-        engineReachable = true
-      } catch {
-        engineReachable = false
-      }
-    }
+    const engineReachable = dockerInstalled ? await isEngineReachable() : false
     return ipcOk({
       dockerInstalled,
       engineReachable,
@@ -196,31 +202,25 @@ ipcMain.handle('app:start-docker-engine', async (): Promise<IpcResult<void>> => 
 ipcMain.handle('app:stop-docker-engine', async (): Promise<IpcResult<void>> => {
   try {
     if (process.platform === 'win32') {
-      const graceful = spawn('docker', ['desktop', 'stop'], {
-        detached: true,
+      void spawn('docker', ['desktop', 'stop'], {
         stdio: 'ignore',
         windowsHide: true,
       })
-      graceful.unref()
       // 后台兜底：若优雅关闭未生效，延后强制结束关键进程（不阻塞当前 IPC）
       setTimeout(() => {
         try {
-          const p1 = spawn('taskkill', ['/IM', 'Docker Desktop.exe', '/F'], {
-            detached: true,
+          void spawn('taskkill', ['/IM', 'Docker Desktop.exe', '/F'], {
             stdio: 'ignore',
             windowsHide: true,
           })
-          p1.unref()
-          const p2 = spawn('taskkill', ['/IM', 'com.docker.backend.exe', '/F'], {
-            detached: true,
+          void spawn('taskkill', ['/IM', 'com.docker.backend.exe', '/F'], {
             stdio: 'ignore',
             windowsHide: true,
           })
-          p2.unref()
         } catch {
           /* ignore fallback errors */
         }
-      }, 12_000)
+      }, 6_000)
       return ipcOk(undefined)
     }
     if (process.platform === 'darwin') {

@@ -25,7 +25,6 @@ export default function App() {
   const { t } = useTranslation()
   const tab = useDockerStore((s) => s.tab)
   const busy = useDockerStore((s) => s.busy)
-  const ping = useDockerStore((s) => s.ping)
   const loadTab = useDockerStore((s) => s.loadTab)
   const globalError = useDockerStore((s) => s.globalError)
   const [checkingBootstrap, setCheckingBootstrap] = useState(true)
@@ -39,9 +38,12 @@ export default function App() {
     setDockerInstalled(status.dockerInstalled)
     setEngineReachable(status.engineReachable)
     setCanStartEngine(status.canStartEngine)
-    await ping()
+    useDockerStore.setState({
+      connectionOk: status.engineReachable,
+      globalError: status.engineReachable ? null : useDockerStore.getState().globalError,
+    })
     return status
-  }, [ping])
+  }, [])
 
   const refreshBootstrap = useCallback(async () => {
     setCheckingBootstrap(true)
