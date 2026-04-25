@@ -275,6 +275,27 @@ let win: BrowserWindow | null = null
 const preload = path.join(__dirname, '../preload/index.mjs')
 const indexHtml = path.join(RENDERER_DIST, 'index.html')
 
+function resolveWindowIconPath(): string | undefined {
+  const publicDir = process.env.VITE_PUBLIC ?? ''
+  const appRoot = process.env.APP_ROOT ?? ''
+  const publicPng = publicDir ? path.join(publicDir, 'icon.png') : ''
+  const publicIco = publicDir ? path.join(publicDir, 'icon.ico') : ''
+  const buildIco = appRoot ? path.join(appRoot, 'build', 'icon.ico') : ''
+
+  if (process.platform === 'win32') {
+    const winCandidates = [buildIco, publicIco, publicPng].filter(Boolean)
+    for (const p of winCandidates) {
+      if (existsSync(p)) return p
+    }
+    return undefined
+  }
+
+  if (publicPng && existsSync(publicPng)) return publicPng
+  return undefined
+}
+
+const windowIconPath = resolveWindowIconPath()
+
 function createLogWindow(containerId: string) {
   const logWin = new BrowserWindow({
     title: 'Docker Browser',
@@ -283,7 +304,7 @@ function createLogWindow(containerId: string) {
     minWidth: 400,
     minHeight: 280,
     autoHideMenuBar: true,
-    icon: path.join(process.env.VITE_PUBLIC ?? '', 'icon.png'),
+    icon: windowIconPath,
     webPreferences: {
       preload,
       nodeIntegration: false,
@@ -323,7 +344,7 @@ function createExecWindow(containerId: string) {
     minWidth: 520,
     minHeight: 360,
     autoHideMenuBar: true,
-    icon: path.join(process.env.VITE_PUBLIC ?? '', 'icon.png'),
+    icon: windowIconPath,
     webPreferences: {
       preload,
       nodeIntegration: false,
@@ -363,7 +384,7 @@ function createFilesWindow(containerId: string, initialPath = '/') {
     minWidth: 400,
     minHeight: 280,
     autoHideMenuBar: true,
-    icon: path.join(process.env.VITE_PUBLIC ?? '', 'icon.png'),
+    icon: windowIconPath,
     webPreferences: {
       preload,
       nodeIntegration: false,
@@ -405,7 +426,7 @@ async function createWindow() {
     height: 780,
     minWidth: 960,
     minHeight: 560,
-    icon: path.join(process.env.VITE_PUBLIC, 'icon.png'),
+    icon: windowIconPath,
     webPreferences: {
       preload,
       nodeIntegration: false,
