@@ -11,6 +11,9 @@ Thumbs.db
 ehthumbs.db
 Desktop.ini
 
+# JetBrains IDE（本地工作区，勿入库）
+.idea/
+
 *.log
 
 *.tsbuildinfo
