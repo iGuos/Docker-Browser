@@ -28,7 +28,7 @@
     "rebuild": "pnpm clean && pnpm dist",
     "dev": "vite",
     "build": "tsc && vite build",
-    "rebuild:electron": "node scripts/ensure-win-msvc.mjs && electron-rebuild -f -w node-pty",
+    "rebuild:electron": "node scripts/ensure-win-msvc.mjs && electron-rebuild -f --only node-pty --types=prod",
     "dist": "pnpm run build && node scripts/gen-icon-ico.mjs && pnpm run rebuild:electron && electron-builder --publish never",
     "dist:dir": "pnpm run build && node scripts/gen-icon-ico.mjs && pnpm run rebuild:electron && electron-builder --dir --publish never",
     "typecheck": "tsc --noEmit",
