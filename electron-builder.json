@@ -11,6 +11,7 @@
   },
   "files": ["dist-electron", "dist", "LICENSE"],
   "icon": "public/icon.png",
+  "afterPack": "scripts/after-pack-win-icon.cjs",
   "mac": {
     "artifactName": "Docker-Browser_${version}.${ext}",
     "target": ["dmg", "zip"]

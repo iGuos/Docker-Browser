@@ -1,10 +1,20 @@
 import { app, BrowserWindow, ipcMain } from 'electron'
-import electronUpdater from 'electron-updater'
-
-const { autoUpdater } = electronUpdater
+import { createRequire } from 'node:module'
 import { AppIpc } from '../../shared/appIpcChannels'
 import type { AppUpdateStatus } from '../../shared/appUpdateStatus'
 import { ipcErr, ipcOk, type IpcResult } from '../../shared/ipc'
+
+const require = createRequire(import.meta.url)
+type AutoUpdaterType = typeof import('electron-updater')['autoUpdater']
+let autoUpdater: AutoUpdaterType | null = null
+let updaterLoadError: string | null = null
+
+try {
+  const electronUpdater = require('electron-updater') as typeof import('electron-updater')
+  autoUpdater = electronUpdater.autoUpdater
+} catch (e) {
+  updaterLoadError = `electron-updater unavailable: ${e instanceof Error ? e.message : String(e)}`
+}
 
 function broadcast(msg: AppUpdateStatus) {
   for (const w of BrowserWindow.getAllWindows()) {
@@ -35,7 +45,7 @@ export function menuCanQuitAndInstall(): boolean {
 
 /** 帮助菜单：检查更新（与渲染进程 IPC 行为一致） */
 export function checkForUpdatesFromMenu(): void {
-  if (!app.isPackaged) return
+  if (!app.isPackaged || !autoUpdater) return
   bindAutoUpdaterEvents()
   void autoUpdater.checkForUpdates().catch((e) =>
     broadcast({ kind: 'error', message: e instanceof Error ? e.message : String(e) }),
@@ -44,13 +54,13 @@ export function checkForUpdatesFromMenu(): void {
 
 /** 帮助菜单：安装已下载的更新并退出 */
 export function quitInstallFromMenu(): void {
-  if (!app.isPackaged || !downloadReadyForQuitInstall) return
+  if (!app.isPackaged || !downloadReadyForQuitInstall || !autoUpdater) return
   bindAutoUpdaterEvents()
   setImmediate(() => autoUpdater.quitAndInstall(false, true))
 }
 
 function bindAutoUpdaterEvents() {
-  if (listenersBound) return
+  if (listenersBound || !autoUpdater) return
   listenersBound = true
   autoUpdater.autoDownload = true
   autoUpdater.autoInstallOnAppQuit = true
@@ -80,7 +90,7 @@ function bindAutoUpdaterEvents() {
 
 /** 打包后延迟静默检查（不阻塞启动） */
 export function scheduleStartupUpdateCheck() {
-  if (!app.isPackaged) return
+  if (!app.isPackaged || !autoUpdater) return
   bindAutoUpdaterEvents()
   const delayMs = 15_000
   setTimeout(() => {
@@ -97,6 +107,7 @@ export function registerAppUpdaterIpc() {
 
   ipcMain.handle(AppIpc.checkForUpdates, async (): Promise<IpcResult<void>> => {
     if (!app.isPackaged) return ipcErr('updates only in packaged app')
+    if (!autoUpdater) return ipcErr(updaterLoadError || 'electron-updater unavailable')
     bindAutoUpdaterEvents()
     try {
       await autoUpdater.checkForUpdates()
@@ -108,6 +119,7 @@ export function registerAppUpdaterIpc() {
 
   ipcMain.handle(AppIpc.quitAndInstall, (): IpcResult<void> => {
     if (!app.isPackaged) return ipcErr('not packaged')
+    if (!autoUpdater) return ipcErr(updaterLoadError || 'electron-updater unavailable')
     bindAutoUpdaterEvents()
     setImmediate(() => autoUpdater.quitAndInstall(false, true))
     return ipcOk(undefined)
