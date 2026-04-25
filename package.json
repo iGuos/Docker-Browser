@@ -8,11 +8,15 @@
   "private": true,
   "type": "module",
   "pnpm": {
+    "//overrides.builder-util-runtime": "锁定 builder-util-runtime，避免 electron-builder / electron-updater 传递依赖版本漂移导致构建或运行时异常。升级 electron-builder 后可删除 override 并执行 pnpm i && pnpm dist 验证。",
     "onlyBuiltDependencies": [
       "electron",
       "esbuild",
       "node-pty"
-    ]
+    ],
+    "overrides": {
+      "builder-util-runtime": "9.5.1"
+    }
   },
   "debug": {
     "env": {
@@ -21,10 +25,12 @@
   },
   "scripts": {
     "clean": "node scripts/clean.mjs",
+    "rebuild": "pnpm clean && pnpm dist",
     "dev": "vite",
     "build": "tsc && vite build",
-    "dist": "pnpm run build && electron-builder --publish never",
-    "dist:dir": "pnpm run build && electron-builder --dir --publish never",
+    "rebuild:electron": "electron-rebuild -f -w node-pty",
+    "dist": "pnpm run build && pnpm run rebuild:electron && electron-builder --publish never",
+    "dist:dir": "pnpm run build && pnpm run rebuild:electron && electron-builder --dir --publish never",
     "typecheck": "tsc --noEmit",
     "pretest": "vite build --mode=test",
     "test": "vitest run",
@@ -50,6 +56,7 @@
     "@types/tar-stream": "^3.1.4",
     "@vitejs/plugin-react": "^4.3.3",
     "autoprefixer": "^10.4.20",
+    "@electron/rebuild": "^3.7.1",
     "electron": "^33.2.0",
     "electron-builder": "^24.13.3",
     "postcss": "^8.4.49",

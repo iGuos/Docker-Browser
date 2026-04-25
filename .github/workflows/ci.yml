@@ -1,5 +1,5 @@
 # 推送 / PR：类型检查 + 测试构建 + Vitest。安装包仅在打 tag 时由 Release 工作流构建（见 release.yml）。
-# Docker-Browser 暂未配置 Playwright E2E；完整 E2E 流程可参考 MCP-Browser 的 ci.yml（xvfb + test:e2e）。
+# Docker-Browser 暂未配置 Playwright E2E；若需补充，可在 CI 中增加 xvfb 与独立 e2e 任务。
 name: CI
 
 on:
