@@ -8,6 +8,11 @@ on:
   pull_request:
     branches: [main, master]
 
+# JavaScript 类 Action 在 runner 上默认用 Node 20 执行；自 2026-06-02 起将默认改 Node 24。提前与官方一致，避免弃用告警。
+# 参考：https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
+
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: false
@@ -24,7 +29,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '24'
           cache: 'pnpm'
 
       - name: Install

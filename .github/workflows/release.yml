@@ -7,6 +7,10 @@ on:
     tags:
       - 'v*'
 
+# 同上，使 checkout/setup-node/artifact 等 Action 的 JS 运行时用 Node 24，消除 Node 20 弃用告警。
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
+
 permissions:
   contents: write
 
@@ -30,7 +34,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '24'
           cache: 'pnpm'
 
       - run: pnpm install --frozen-lockfile
