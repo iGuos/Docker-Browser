@@ -408,7 +408,7 @@ export function CreateContainerModal({ open, onClose, onCreated }: Props) {
                   <input
                     value={publishText}
                     onChange={(e) => setPublishText(e.target.value)}
-                    placeholder="8080:80"
+                    placeholder={t('create.publishPlaceholder')}
                     className="mt-1 w-full rounded-md border border-zinc-300 bg-white px-2 py-1.5 font-mono text-[11px] dark:border-zinc-600 dark:bg-zinc-950"
                   />
                 </label>
@@ -607,7 +607,7 @@ export function CreateContainerModal({ open, onClose, onCreated }: Props) {
                 <input
                   value={dockerfileImageTag}
                   onChange={(e) => setDockerfileImageTag(e.target.value)}
-                  placeholder="myrepo/myapp:dev"
+                  placeholder={t('create.dockerfileImageTagPlaceholder')}
                   className="mt-1 w-full rounded-md border border-zinc-300 bg-white px-2 py-1.5 font-mono text-[11px] dark:border-zinc-600 dark:bg-zinc-950"
                 />
               </label>

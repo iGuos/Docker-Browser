@@ -28,9 +28,10 @@
     "rebuild": "pnpm clean && pnpm dist",
     "dev": "vite",
     "build": "tsc && vite build",
-    "rebuild:electron": "node scripts/ensure-win-msvc.mjs && electron-rebuild -f --only node-pty --types=prod",
-    "dist": "pnpm run build && node scripts/gen-icon-ico.mjs && pnpm run rebuild:electron && electron-builder --publish never",
-    "dist:dir": "pnpm run build && node scripts/gen-icon-ico.mjs && pnpm run rebuild:electron && electron-builder --dir --publish never",
+    "rebuild:electron": "node scripts/rebuild-electron.mjs",
+    "dist": "pnpm run build && node scripts/gen-icon-ico.mjs && pnpm run rebuild:electron && electron-builder --publish never && pnpm run verify:pack",
+    "dist:dir": "pnpm run build && node scripts/gen-icon-ico.mjs && pnpm run rebuild:electron && electron-builder --dir --publish never && pnpm run verify:pack",
+    "verify:pack": "node scripts/verify-packaged-modules.mjs",
     "typecheck": "tsc --noEmit",
     "pretest": "vite build --mode=test",
     "test": "vitest run",
@@ -67,7 +68,6 @@
     "tar-stream": "^3.1.8",
     "tiny-typed-emitter": "^2.1.0",
     "universalify": "^2.0.1",
-    "uuid": "^14.0.0",
     "zustand": "^5.0.12"
   },
   "devDependencies": {

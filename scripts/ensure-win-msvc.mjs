@@ -26,7 +26,7 @@ electron-rebuild 需要 MSVC（与 node-gyp 相同）。请任选其一：
   3. 安装完成后重新打开终端，再执行：pnpm dist
 
 【方式 B】命令行（PowerShell，需 winget；可能弹出 UAC）
-  winget install --id Microsoft.VisualStudio.2022.BuildTools -e --accept-package-agreements --accept-source-agreements --override "--wait --passive --add Microsoft.VisualStudio.Workload.VCTools --includeRecommended"
+  winget install --id Microsoft.VisualStudio.2022.BuildTools -e --accept-package-agreements --accept-source-agreements --override "--wait --passive --add Microsoft.VisualStudio.Workload.VCTools --add Microsoft.VisualStudio.Component.VC.Runtimes.x86.x64.Spectre --includeRecommended"
 
 若已安装但仍报错：在「Visual Studio Installer」里点「修改」，确认已勾选上述 C++ 工作负载。
 
@@ -62,4 +62,39 @@ if (r.status !== 0 || !installPath) {
   process.exit(1)
 }
 
+const spectreMitigationDisabled =
+  process.env.npm_config_msvs_enable_spectre_mitigation === 'false' ||
+  process.env.npm_config_msvs_enable_spectre_mitigation === '0'
+
+const spectre = spawnSync(
+  vswhere,
+  [
+    '-latest',
+    '-products',
+    '*',
+    '-requires',
+    'Microsoft.VisualStudio.Component.VC.Runtimes.x86.x64.Spectre',
+    '-property',
+    'installationPath',
+  ],
+  { encoding: 'utf8' },
+)
+
+const spectrePath = (spectre.stdout || '').trim()
+if (!spectreMitigationDisabled && (spectre.status !== 0 || !spectrePath)) {
+  console.error(
+    `${hint}\n（当前还缺 Spectre 缓解库组件：Microsoft.VisualStudio.Component.VC.Runtimes.x86.x64.Spectre）\n` +
+      '请打开 Visual Studio Installer -> Build Tools -> 修改 -> 单个组件，安装：\n' +
+      '  - MSVC v143 Spectre-mitigated libs (x86 & x64)\n' +
+      '或执行（PowerShell）：\n' +
+      '  winget install --id Microsoft.VisualStudio.2022.BuildTools -e --accept-package-agreements --accept-source-agreements --override "--wait --passive --add Microsoft.VisualStudio.Workload.VCTools --add Microsoft.VisualStudio.Component.VC.Runtimes.x86.x64.Spectre --includeRecommended"\n',
+  )
+  process.exit(1)
+}
+
 console.log(`[ensure-win-msvc] VC++ 工具链: ${installPath}`)
+if (spectreMitigationDisabled) {
+  console.log('[ensure-win-msvc] Spectre mitigation check skipped (npm_config_msvs_enable_spectre_mitigation=false)')
+} else {
+  console.log(`[ensure-win-msvc] Spectre libs: ${spectrePath}`)
+}

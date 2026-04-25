@@ -26,7 +26,7 @@ export function ThemeSwitcher() {
     <div
       className="inline-flex shrink-0 rounded-lg border border-zinc-200/90 bg-zinc-100/80 p-0.5 dark:border-white/[0.08] dark:bg-zinc-900/50"
       role="group"
-      aria-label="Theme"
+      aria-label={t('theme.groupAria')}
     >
       {btn('light', t('theme.light'))}
       {btn('dark', t('theme.dark'))}

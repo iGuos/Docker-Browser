@@ -145,6 +145,11 @@ export interface DockerDesktopApi {
   reconnectDocker(): Promise<IpcResult<void>>
   getDockerRuntimeEnv(): Promise<IpcResult<{ dockerHost: string; dockerContext: string }>>
   getComposeVersion(): Promise<IpcResult<string>>
+  getDockerBootstrapStatus(): Promise<
+    IpcResult<{ dockerInstalled: boolean; engineReachable: boolean; canStartEngine: boolean }>
+  >
+  startDockerEngine(): Promise<IpcResult<void>>
+  stopDockerEngine(): Promise<IpcResult<void>>
   getHostMetrics(): Promise<IpcResult<HostMetrics>>
   openPathInExplorer(p: string): Promise<IpcResult<void>>
   onLogsChunk(handler: (msg: DockerLogsChunk) => void): () => void

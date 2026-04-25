@@ -3,14 +3,16 @@ import type { AppLanguage } from '../../shared/locale'
 import type { ThemePreference } from '../../shared/theme'
 import { ipcErr, ipcOk, type IpcResult } from '../../shared/ipc'
 import type { HostMetrics } from '../../shared/hostMetrics'
-import { spawnSync } from 'node:child_process'
+import { spawn, spawnSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
 import os, { type CpuInfo } from 'node:os'
+import { existsSync } from 'node:fs'
 import { installAppMenu, rebuildApplicationMenu, syncNativeThemeSource } from './appMenu'
 import { openExternalUrlIfAllowed } from './openExternalPolicy'
 import { registerDockerIpc } from './ipcDocker'
 import { registerAppUpdaterIpc, scheduleStartupUpdateCheck, setUpdaterMenuRefresh } from './updater'
+import { getDocker } from './dockerClient'
 
 registerDockerIpc()
 registerAppUpdaterIpc()
@@ -104,6 +106,132 @@ ipcMain.handle('app:get-compose-version', async (): Promise<IpcResult<string>> =
       return ipcErr(msg)
     }
     return ipcOk((r.stdout || '').trim() || 'ok')
+  } catch (e) {
+    return ipcErr(e instanceof Error ? e.message : String(e))
+  }
+})
+
+function dockerCliInstalled(): boolean {
+  try {
+    const r = spawnSync('docker', ['--version'], {
+      encoding: 'utf8',
+      timeout: 6_000,
+      windowsHide: true,
+    })
+    return !r.error && r.status === 0
+  } catch {
+    return false
+  }
+}
+
+function getWindowsDockerDesktopExePath(): string | null {
+  const local = process.env.LOCALAPPDATA ?? ''
+  const programFiles = process.env['ProgramFiles'] ?? ''
+  const candidates = [
+    local ? path.join(local, 'Docker', 'Docker', 'Docker Desktop.exe') : '',
+    programFiles ? path.join(programFiles, 'Docker', 'Docker', 'Docker Desktop.exe') : '',
+  ].filter(Boolean)
+  for (const p of candidates) {
+    if (existsSync(p)) return p
+  }
+  return null
+}
+
+function canStartDockerEngine(): boolean {
+  if (process.platform === 'win32') return getWindowsDockerDesktopExePath() !== null
+  if (process.platform === 'darwin') return true
+  return false
+}
+
+ipcMain.handle(
+  'app:get-docker-bootstrap-status',
+  async (): Promise<
+    IpcResult<{ dockerInstalled: boolean; engineReachable: boolean; canStartEngine: boolean }>
+  > => {
+    const dockerInstalled = dockerCliInstalled()
+    let engineReachable = false
+    if (dockerInstalled) {
+      try {
+        await getDocker().ping()
+        engineReachable = true
+      } catch {
+        engineReachable = false
+      }
+    }
+    return ipcOk({
+      dockerInstalled,
+      engineReachable,
+      canStartEngine: dockerInstalled && !engineReachable && canStartDockerEngine(),
+    })
+  },
+)
+
+ipcMain.handle('app:start-docker-engine', async (): Promise<IpcResult<void>> => {
+  try {
+    if (process.platform === 'win32') {
+      const exePath = getWindowsDockerDesktopExePath()
+      if (!exePath) return ipcErr('Docker Desktop not found')
+      const cp = spawn(exePath, [], {
+        detached: true,
+        stdio: 'ignore',
+        windowsHide: true,
+      })
+      cp.unref()
+      return ipcOk(undefined)
+    }
+    if (process.platform === 'darwin') {
+      const cp = spawn('open', ['-a', 'Docker'], {
+        detached: true,
+        stdio: 'ignore',
+      })
+      cp.unref()
+      return ipcOk(undefined)
+    }
+    return ipcErr('Auto-start is not supported on this platform')
+  } catch (e) {
+    return ipcErr(e instanceof Error ? e.message : String(e))
+  }
+})
+
+ipcMain.handle('app:stop-docker-engine', async (): Promise<IpcResult<void>> => {
+  try {
+    if (process.platform === 'win32') {
+      const graceful = spawn('docker', ['desktop', 'stop'], {
+        detached: true,
+        stdio: 'ignore',
+        windowsHide: true,
+      })
+      graceful.unref()
+      // 后台兜底：若优雅关闭未生效，延后强制结束关键进程（不阻塞当前 IPC）
+      setTimeout(() => {
+        try {
+          const p1 = spawn('taskkill', ['/IM', 'Docker Desktop.exe', '/F'], {
+            detached: true,
+            stdio: 'ignore',
+            windowsHide: true,
+          })
+          p1.unref()
+          const p2 = spawn('taskkill', ['/IM', 'com.docker.backend.exe', '/F'], {
+            detached: true,
+            stdio: 'ignore',
+            windowsHide: true,
+          })
+          p2.unref()
+        } catch {
+          /* ignore fallback errors */
+        }
+      }, 12_000)
+      return ipcOk(undefined)
+    }
+    if (process.platform === 'darwin') {
+      const r = spawn('osascript', ['-e', 'tell application "Docker" to quit'], {
+        detached: true,
+        stdio: 'ignore',
+      })
+      r.unref()
+      return ipcOk(undefined)
+    }
+    return ipcErr('Stop action is not supported on this platform')
   } catch (e) {
     return ipcErr(e instanceof Error ? e.message : String(e))
   }

@@ -15,16 +15,19 @@ import type { AppAlertOptions } from '@/lib/alertMessage'
 type Visual =
   | { kind: 'alert'; message: string; copyable?: boolean }
   | { kind: 'confirm'; message: string }
+  | { kind: 'prompt'; message: string; placeholder?: string; initialValue?: string }
 
 type Pending =
   | { kind: 'alert'; resolve: () => void }
   | { kind: 'confirm'; resolve: (ok: boolean) => void }
+  | { kind: 'prompt'; resolve: (value: string | null) => void }
 
 export type { AppAlertOptions }
 
 export type AppDialogApi = {
   alert: (message: string, options?: AppAlertOptions) => Promise<void>
   confirm: (message: string) => Promise<boolean>
+  prompt: (message: string, options?: { placeholder?: string; initialValue?: string }) => Promise<string | null>
 }
 
 const AppDialogContext = createContext<AppDialogApi | null>(null)
@@ -42,20 +45,25 @@ export function AppDialogProvider({ children }: { children: ReactNode }) {
   const panelRef = useRef<HTMLDivElement>(null)
   const primaryBtnRef = useRef<HTMLButtonElement>(null)
   const copyableTextareaRef = useRef<HTMLTextAreaElement>(null)
+  const promptInputRef = useRef<HTMLInputElement>(null)
+  const [promptValue, setPromptValue] = useState('')
 
-  const finish = useCallback((result?: boolean) => {
+  const finish = useCallback((result?: boolean | string) => {
     const p = pendingRef.current
     pendingRef.current = null
     setVisual(null)
+    setPromptValue('')
     if (!p) return
     if (p.kind === 'alert') p.resolve()
-    else p.resolve(result === true)
+    else if (p.kind === 'confirm') p.resolve(result === true)
+    else p.resolve(typeof result === 'string' ? result : null)
   }, [])
 
   useEffect(() => {
     if (!visual) return
     const id = window.requestAnimationFrame(() => {
       if (visual.kind === 'alert' && visual.copyable) copyableTextareaRef.current?.focus()
+      else if (visual.kind === 'prompt') promptInputRef.current?.focus()
       else primaryBtnRef.current?.focus()
     })
     return () => window.cancelAnimationFrame(id)
@@ -66,6 +74,7 @@ export function AppDialogProvider({ children }: { children: ReactNode }) {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         if (visual.kind === 'confirm') finish(false)
+        else if (visual.kind === 'prompt') finish()
         else finish()
       }
     }
@@ -112,7 +121,23 @@ export function AppDialogProvider({ children }: { children: ReactNode }) {
     })
   }, [])
 
-  const value = useMemo(() => ({ alert, confirm }), [alert, confirm])
+  const prompt = useCallback(
+    (message: string, options?: { placeholder?: string; initialValue?: string }) => {
+      return new Promise<string | null>((resolve) => {
+        pendingRef.current = { kind: 'prompt', resolve }
+        setPromptValue(options?.initialValue ?? '')
+        setVisual({
+          kind: 'prompt',
+          message,
+          placeholder: options?.placeholder,
+          initialValue: options?.initialValue,
+        })
+      })
+    },
+    [],
+  )
+
+  const value = useMemo(() => ({ alert, confirm, prompt }), [alert, confirm, prompt])
 
   return (
     <AppDialogContext.Provider value={value}>
@@ -161,11 +186,27 @@ export function AppDialogProvider({ children }: { children: ReactNode }) {
                 {visual.message}
               </p>
             )}
+            {visual.kind === 'prompt' ? (
+              <input
+                ref={promptInputRef}
+                type="text"
+                value={promptValue}
+                placeholder={visual.placeholder}
+                onChange={(e) => setPromptValue(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault()
+                    finish(promptValue)
+                  }
+                }}
+                className="mt-3 w-full rounded-md border border-zinc-300 bg-white px-2 py-1.5 text-[12px] text-zinc-800 outline-none ring-sky-500 focus:ring-2 dark:border-zinc-600 dark:bg-zinc-950 dark:text-zinc-100"
+              />
+            ) : null}
             <div className="mt-4 flex justify-end gap-2">
-              {visual.kind === 'confirm' ? (
+              {visual.kind === 'confirm' || visual.kind === 'prompt' ? (
                 <button
                   type="button"
-                  onClick={() => finish(false)}
+                  onClick={() => (visual.kind === 'confirm' ? finish(false) : finish())}
                   className="rounded-md border border-zinc-300 px-3 py-1.5 text-[11px] dark:border-zinc-600"
                 >
                   {t('common.cancel')}
@@ -174,10 +215,14 @@ export function AppDialogProvider({ children }: { children: ReactNode }) {
               <button
                 ref={primaryBtnRef}
                 type="button"
-                onClick={() => (visual.kind === 'confirm' ? finish(true) : finish())}
+                onClick={() => {
+                  if (visual.kind === 'confirm') finish(true)
+                  else if (visual.kind === 'prompt') finish(promptValue)
+                  else finish()
+                }}
                 className="rounded-md bg-sky-600 px-3 py-1.5 text-[11px] font-semibold text-white hover:bg-sky-500"
               >
-                {visual.kind === 'confirm' ? t('common.confirm') : t('common.ok')}
+                {visual.kind === 'confirm' || visual.kind === 'prompt' ? t('common.confirm') : t('common.ok')}
               </button>
             </div>
           </div>

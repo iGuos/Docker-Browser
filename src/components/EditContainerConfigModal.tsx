@@ -131,7 +131,7 @@ export function EditContainerConfigModal({ open, containerId, onClose, onRecreat
               value={publishText}
               onChange={(e) => setPublishText(e.target.value)}
               disabled={!!loadErr}
-              placeholder="8080:80"
+              placeholder={t('create.publishPlaceholder')}
               className="mt-1 w-full rounded-md border border-zinc-300 bg-white px-2 py-1.5 font-mono text-[11px] dark:border-zinc-600 dark:bg-zinc-950"
             />
           </label>

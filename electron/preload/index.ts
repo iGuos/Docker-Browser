@@ -324,6 +324,17 @@ contextBridge.exposeInMainWorld('dockerDesktop', {
   getComposeVersion(): Promise<IpcResult<string>> {
     return ipcRenderer.invoke('app:get-compose-version')
   },
+  getDockerBootstrapStatus(): Promise<
+    IpcResult<{ dockerInstalled: boolean; engineReachable: boolean; canStartEngine: boolean }>
+  > {
+    return ipcRenderer.invoke('app:get-docker-bootstrap-status')
+  },
+  startDockerEngine(): Promise<IpcResult<void>> {
+    return ipcRenderer.invoke('app:start-docker-engine')
+  },
+  stopDockerEngine(): Promise<IpcResult<void>> {
+    return ipcRenderer.invoke('app:stop-docker-engine')
+  },
   getHostMetrics(): Promise<IpcResult<HostMetrics>> {
     return ipcRenderer.invoke('app:get-host-metrics')
   },
