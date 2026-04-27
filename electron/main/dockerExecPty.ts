@@ -4,6 +4,7 @@ import os from 'node:os'
 import * as pty from 'node-pty'
 import { DockerIpc } from '../../shared/dockerIpcChannels'
 import { ipcErr, ipcOk, type IpcResult } from '../../shared/ipc'
+import { envWithDockerCliInPath } from './dockerCliPath'
 
 type PtySession = { pty: pty.IPty; wc: WebContents }
 
@@ -52,7 +53,7 @@ export function registerDockerExecPtyIpc(): void {
           cols,
           rows,
           cwd: os.homedir(),
-          env: { ...process.env } as Record<string, string>,
+          env: envWithDockerCliInPath() as Record<string, string>,
         })
       } catch (e) {
         return ipcErr(e instanceof Error ? e.message : String(e))

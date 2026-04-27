@@ -4,6 +4,8 @@ import fs from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
 
+import { envWithDockerCliInPath } from './dockerCliPath'
+
 const execFileAsync = promisify(execFile)
 
 const CLI_LOG_MAX = 16000
@@ -29,6 +31,7 @@ function runShellCommand(
       cwd,
       windowsHide: true,
       stdio: ['ignore', 'pipe', 'pipe'],
+      env: envWithDockerCliInPath(),
     })
     let stderr = ''
     let stdoutAcc = ''
@@ -65,6 +68,7 @@ function runDockerArgv(
       cwd,
       windowsHide: true,
       stdio: ['ignore', 'pipe', 'pipe'],
+      env: envWithDockerCliInPath(),
     })
     let stderr = ''
     let stdoutAcc = ''
@@ -176,6 +180,7 @@ async function assertContainerRunning(nameOrId: string, onProgress?: (chunk: str
       const { stdout } = await execFileAsync('docker', ['inspect', '-f', '{{.State.Running}}', nameOrId], {
         windowsHide: true,
         maxBuffer: 1024 * 1024,
+        env: envWithDockerCliInPath(),
       })
       if (stdout.trim().toLowerCase() === 'true') {
         emitProgress(onProgress, 'State.Running=true OK\n')
@@ -191,7 +196,7 @@ async function assertContainerRunning(nameOrId: string, onProgress?: (chunk: str
     const { stdout } = await execFileAsync(
       'docker',
       ['inspect', '-f', '{{.State.Status}} exit={{.State.ExitCode}}', nameOrId],
-      { windowsHide: true, maxBuffer: 1024 * 1024 },
+      { windowsHide: true, maxBuffer: 1024 * 1024, env: envWithDockerCliInPath() },
     )
     detail = stdout.trim() || detail
   } catch (e) {

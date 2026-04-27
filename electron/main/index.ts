@@ -13,6 +13,7 @@ import { openExternalUrlIfAllowed } from './openExternalPolicy'
 import { registerDockerIpc } from './ipcDocker'
 import { registerAppUpdaterIpc, scheduleStartupUpdateCheck, setUpdaterMenuRefresh } from './updater'
 import { getDocker } from './dockerClient'
+import { DOCKER_DESKTOP_MAC_CLI, envWithDockerCliInPath } from './dockerCliPath'
 
 registerDockerIpc()
 registerAppUpdaterIpc()
@@ -99,6 +100,7 @@ ipcMain.handle('app:get-compose-version', async (): Promise<IpcResult<string>> =
     const r = spawnSync('docker', ['compose', 'version'], {
       encoding: 'utf8',
       timeout: 12_000,
+      env: envWithDockerCliInPath(),
     })
     if (r.error) return ipcErr(r.error.message)
     if (r.status !== 0) {
@@ -112,13 +114,25 @@ ipcMain.handle('app:get-compose-version', async (): Promise<IpcResult<string>> =
 })
 
 function dockerCliInstalled(): boolean {
+  const env = envWithDockerCliInPath()
   try {
     const r = spawnSync('docker', ['--version'], {
       encoding: 'utf8',
       timeout: 6_000,
       windowsHide: true,
+      env,
     })
-    return !r.error && r.status === 0
+    if (!r.error && r.status === 0) return true
+    if (process.platform === 'darwin' && existsSync(DOCKER_DESKTOP_MAC_CLI)) {
+      const r2 = spawnSync(DOCKER_DESKTOP_MAC_CLI, ['--version'], {
+        encoding: 'utf8',
+        timeout: 6_000,
+        windowsHide: true,
+        env,
+      })
+      return !r2.error && r2.status === 0
+    }
+    return false
   } catch {
     return false
   }
@@ -163,7 +177,8 @@ ipcMain.handle(
     IpcResult<{ dockerInstalled: boolean; engineReachable: boolean; canStartEngine: boolean }>
   > => {
     const dockerInstalled = dockerCliInstalled()
-    const engineReachable = dockerInstalled ? await isEngineReachable() : false
+    // 引擎连通性不依赖 PATH 上的 docker；打包后 PATH 短时仍应能连上默认 socket
+    const engineReachable = await isEngineReachable()
     return ipcOk({
       dockerInstalled,
       engineReachable,
