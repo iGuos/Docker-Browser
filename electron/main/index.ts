@@ -281,7 +281,10 @@ if (os.release().startsWith('6.1')) app.disableHardwareAcceleration()
 
 if (process.platform === 'win32') app.setAppUserModelId(app.getName())
 
-if (!app.requestSingleInstanceLock()) {
+// 开发模式下由 Vite 注入 VITE_DEV_SERVER_URL；此时放宽单例锁，避免残留 Electron 进程
+// 导致子进程立刻 exit(0)，进而触发 vite-plugin-electron 对父进程 process.exit，表现为 pnpm dev「秒退」。
+const devFromVite = Boolean(process.env.VITE_DEV_SERVER_URL)
+if (!devFromVite && !app.requestSingleInstanceLock()) {
   app.quit()
   process.exit(0)
 }
