@@ -1,6 +1,6 @@
 # Docker Browser — macOS 安装与无法打开说明
 
-> **Docker Browser** 预构建包未经过 Apple 公证。首次安装或打开时若被系统拦截、或提示「已损坏」，通常与 **门禁（Gatekeeper）** 与下载标记 **隔离（quarantine）** 有关，可按下文处理。
+> **Docker Browser** 预构建包未经过 Apple 公证。首次安装或打开时若被系统拦截、或提示「已损坏」，通常与 **门禁（Gatekeeper）** 有关，可按下文处理。
 
 ---
 
@@ -13,64 +13,75 @@
 
 ---
 
-## 2. 系统设置：允许来源
+## 2. 最简单的方法：Finder 右键打开（推荐）
 
-1. 点击屏幕左上角 **苹果菜单**（）> **系统设置**（macOS Monterey 及更早为 **系统偏好设置**）。
-2. 打开 **隐私与安全性**（较早版本为 **安全性与隐私**）。
-3. 若出现与「仍要打开」或「已阻止使用」相关的提示，按界面指引允许；必要时在 **安全性** 区域查看是否可放行本应用。
+1. 打开 **访达（Finder）**，进入 **应用程序** 文件夹，找到 **Docker Browser**。
+2. **右键单击**（或按住 Control 再单击）应用图标，选择 **「打开」**。
+3. 弹出安全警告后，再次点击 **「打开」**。
 
----
-
-## 3. 移除隔离标记（推荐优先尝试）
-
-从网络下载的应用会带有 `com.apple.quarantine` 属性，可能触发「应用已损坏」等误报。对**已安装**的 `.app` 执行（路径请按实际安装位置修改）：
-
-```bash
-sudo xattr -r -d com.apple.quarantine "/Applications/Docker Browser.app"
-```
-
-若安装在用户目录下，例如：
-
-```bash
-sudo xattr -r -d com.apple.quarantine ~/Applications/Docker\ Browser.app
-```
+这样会永久添加 Gatekeeper 例外，以后双击正常启动。
 
 ---
 
-## 4. 若没有放行选项（慎用全局门禁）
-
-在「终端」中以**管理员**执行（会全局放宽门禁，用毕建议恢复）：
+## 3. 命令行方法：添加 Gatekeeper 例外
 
 ```bash
+sudo spctl --add "/Applications/Docker Browser.app"
+```
+
+执行后重新打开应用即可。若安装在用户目录下，将路径改为实际位置：
+
+```bash
+sudo spctl --add ~/Applications/Docker\ Browser.app
+```
+
+> **为什么不用 `xattr -r -d com.apple.quarantine`？**
+> 
+> GitHub 发布的包在 Apple Silicon 上经过了代码签名（ARM64 系统要求）。macOS 会阻止对已签名 app bundle 内部文件的 xattr 修改，导致大量 `Operation not permitted` 报错。`spctl --add` 通过 Gatekeeper 策略数据库添加例外，不需要修改文件属性，因此不会遇到该问题。
+
+---
+
+## 4. 通过系统设置放行
+
+1. 点击 **苹果菜单 → 系统设置 → 隐私与安全性**。
+2. 在 **安全性** 区域查找是否出现「仍要打开」提示，按指引允许。
+
+---
+
+## 5. 最后手段：临时全局放宽门禁（慎用）
+
+```bash
+# 关闭全局门禁
 sudo spctl --master-disable
-```
-
-恢复默认策略：
-
-```bash
+# 打开应用后恢复默认
 sudo spctl --master-enable
 ```
 
 ---
 
-## 5. 命令对照
+## 6. 命令对照
 
-| 命令 | 作用范围 | 说明 |
-|------|----------|------|
-| `sudo xattr -r -d com.apple.quarantine <.app 路径>` | 单个应用 | 仅清除该应用的隔离标记；在信任本应用时**优先使用**。 |
-| `sudo spctl --master-disable` | 整个系统 | 全局允许未签名/未公证应用，直至 `master-enable`；**慎用**，不建议长期开启。 |
+| 命令 | 作用范围 | 是否推荐 |
+|------|----------|----------|
+| Finder 右键 → 打开 | 单个应用 | ✅ 推荐首选 |
+| `sudo spctl --add <.app 路径>` | 单个应用 | ✅ 推荐 |
+| `sudo xattr -r -d com.apple.quarantine <.app 路径>` | 单个应用 | ⚠️ 已签名包会报 Operation not permitted，无效 |
+| `sudo spctl --master-disable` | 整个系统 | ⚠️ 慎用，不建议长期开启 |
 
 ---
 
-## 6. English summary
+## 7. English summary
 
-Prebuilt **Docker Browser** is **not Apple-notarized**. If macOS blocks launch or reports the app as **damaged**, prefer removing quarantine for this app only:
+Prebuilt **Docker Browser** is **not Apple-notarized**. If macOS blocks launch or reports the app as **damaged**, use one of these methods:
 
+**Easiest:** Right-click the app in Finder → **Open** → click **Open** in the warning dialog.
+
+**Terminal:**
 ```bash
-sudo xattr -r -d com.apple.quarantine "/Applications/Docker Browser.app"
+sudo spctl --add "/Applications/Docker Browser.app"
 ```
 
-If needed, use **System Settings → Privacy & Security** to allow the app. As a last resort you can temporarily run `sudo spctl --master-disable`, then `sudo spctl --master-enable` when done.
+> Note: `sudo xattr -r -d com.apple.quarantine` does **not** work for this app because the bundle is code-signed (required for Apple Silicon). Use `spctl --add` instead — it adds a Gatekeeper exception without modifying file attributes.
 
 ---
 

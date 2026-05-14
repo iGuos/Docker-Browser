@@ -14,7 +14,11 @@
   "afterPack": "scripts/after-pack-win-icon.cjs",
   "mac": {
     "artifactName": "Docker-Browser_${version}.${ext}",
-    "target": ["dmg", "zip"]
+    "hardenedRuntime": false,
+    "target": [
+      { "target": "dmg", "arch": ["x64"] },
+      { "target": "zip", "arch": ["x64"] }
+    ]
   },
   "win": {
     "icon": "build/icon.ico",
