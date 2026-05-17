@@ -4,7 +4,7 @@ import os from 'node:os'
 import * as pty from 'node-pty'
 import { DockerIpc } from '../../shared/dockerIpcChannels'
 import { ipcErr, ipcOk, type IpcResult } from '../../shared/ipc'
-import { envWithDockerCliInPath } from './dockerCliPath'
+import { envWithDockerCliInPath, resolveDockerBin } from './dockerCliPath'
 
 type PtySession = { pty: pty.IPty; wc: WebContents }
 
@@ -43,7 +43,7 @@ export function registerDockerExecPtyIpc(): void {
       const wc = evt.sender
       const subscriptionId = randomUUID()
 
-      const dockerBin = process.platform === 'win32' ? 'docker.exe' : 'docker'
+      const dockerBin = resolveDockerBin()
       const args = ['exec', '-it', containerId, '/bin/sh']
 
       let term: pty.IPty
