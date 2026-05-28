@@ -184,8 +184,8 @@ pub async fn container_fs_mkdir(container_id: String, path: String) -> Result<()
 }
 
 #[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct FilePathResult {
-    #[serde(rename = "filePath")]
     pub file_path: String,
 }
 

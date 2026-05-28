@@ -35,6 +35,7 @@ pub async fn create_volume(name: String) -> Result<VolumeNameResult> {
 }
 
 #[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct VolumeUsedByResult {
     pub container_ids: Vec<String>,
 }

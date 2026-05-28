@@ -8,16 +8,16 @@ use tauri::{AppHandle, Emitter};
 use uuid::Uuid;
 
 #[derive(Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
 pub struct LogsChunk {
-    #[serde(rename = "subscriptionId")]
     pub subscription_id: String,
     pub text: String,
     pub stream: String,
 }
 
 #[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct SubscriptionResult {
-    #[serde(rename = "subscriptionId")]
     pub subscription_id: String,
 }
 
@@ -88,8 +88,8 @@ pub async fn logs_stop(subscription_id: String) -> Result<()> {
 }
 
 #[derive(Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
 pub struct EventChunk {
-    #[serde(rename = "subscriptionId")]
     pub subscription_id: String,
     pub line: String,
 }

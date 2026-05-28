@@ -5,6 +5,7 @@ use std::process::Command;
 use tauri::AppHandle;
 
 #[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct AppVersion {
     pub version: String,
     pub is_packaged: bool,
@@ -18,6 +19,7 @@ pub fn get_app_version(app: AppHandle) -> Result<AppVersion> {
 }
 
 #[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct DockerRuntimeEnv {
     pub docker_host: String,
     pub docker_context: String,
@@ -32,6 +34,7 @@ pub fn get_docker_runtime_env() -> Result<DockerRuntimeEnv> {
 }
 
 #[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct DockerBootstrapStatus {
     pub docker_installed: bool,
     pub engine_reachable: bool,
@@ -137,6 +140,7 @@ pub async fn stop_docker_engine() -> Result<()> {
 }
 
 #[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct HostMetrics {
     pub hostname: String,
     pub total_mem_bytes: u64,

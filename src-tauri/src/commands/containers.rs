@@ -77,18 +77,14 @@ pub async fn remove_container(id: String, force: Option<bool>, v: Option<bool>) 
 // ──────────────────────────── Create / Recreate ────────────────────────────
 
 #[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct CreateRunPayload {
     pub image: String,
     pub name: Option<String>,
-    #[serde(rename = "envText")]
     pub env_text: Option<String>,
-    #[serde(rename = "publishText")]
     pub publish_text: Option<String>,
-    #[serde(rename = "cmdText")]
     pub cmd_text: Option<String>,
-    #[serde(rename = "autoRemove")]
     pub auto_remove: Option<bool>,
-    #[serde(rename = "restartPolicy")]
     pub restart_policy: Option<String>,
 }
 
@@ -148,16 +144,13 @@ pub async fn recreate_container(
 }
 
 #[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct PatchRuntimePayload {
-    #[serde(rename = "containerId")]
     pub container_id: String,
     pub name: Option<String>,
-    #[serde(rename = "restartPolicy")]
     pub restart_policy: Option<String>,
-    #[serde(rename = "memoryMb")]
     pub memory_mb: Option<i64>,
     pub cpus: Option<f64>,
-    #[serde(rename = "pidsLimit")]
     pub pids_limit: Option<i64>,
 }
 
@@ -198,9 +191,9 @@ pub async fn patch_container_runtime(payload: PatchRuntimePayload) -> Result<()>
 // ──────────────────────────── Exec (one-shot) ────────────────────────────
 
 #[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ExecResult {
     pub output: String,
-    #[serde(rename = "exitCode")]
     pub exit_code: Option<i64>,
 }
 
@@ -342,8 +335,8 @@ pub async fn commit_container(
 }
 
 #[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct FilePathResult {
-    #[serde(rename = "filePath")]
     pub file_path: String,
 }
 

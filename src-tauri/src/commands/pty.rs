@@ -15,23 +15,22 @@ fn pty_sessions() -> &'static PtySessions {
 }
 
 #[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct PtyStartResult {
-    #[serde(rename = "subscriptionId")]
     pub subscription_id: String,
 }
 
 #[derive(Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
 struct PtyData {
-    #[serde(rename = "subscriptionId")]
     subscription_id: String,
     data: String,
 }
 
 #[derive(Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
 struct PtyExit {
-    #[serde(rename = "subscriptionId")]
     subscription_id: String,
-    #[serde(rename = "exitCode")]
     exit_code: i32,
 }
 
