@@ -1,6 +1,7 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
 import '@/i18n/i18n'
+import '@/lib/tauri-ipc'   // 挂载 window.dockerDesktop → Tauri invoke
 import App from './App'
 import { ContainerLogsWindowApp } from './ContainerLogsWindowApp'
 import { ContainerExecWindowApp } from './ContainerExecWindowApp'

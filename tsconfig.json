@@ -21,6 +21,6 @@
       "@shared/*": ["shared/*"]
     }
   },
-  "include": ["src", "electron", "shared"],
-  "references": [{ "path": "./tsconfig.node.json" }]
+  "include": ["src", "shared"],
+  "exclude": ["src-tauri", "node_modules", "dist"]
 }
