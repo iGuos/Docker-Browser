@@ -5,7 +5,7 @@ import {
   extractInspectLabels,
   extractInspectMounts,
   extractInspectNetworkNames,
-} from '@shared/inspectContainerSummary'
+} from '@/types/inspectContainerSummary'
 
 type Props = {
   open: boolean

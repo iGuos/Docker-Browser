@@ -8,7 +8,7 @@ import {
   LANGUAGE_STORAGE_KEY,
   parseAppLanguage,
   type AppLanguage,
-} from '@shared/locale'
+} from '@/types/locale'
 
 function readStoredLanguage(): AppLanguage {
   try {

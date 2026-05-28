@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useModalEscape } from '@/hooks/useModalEscape'
-import { normalizeRestartPolicyName, type RestartPolicyName } from '@shared/restartPolicy'
+import { normalizeRestartPolicyName, type RestartPolicyName } from '@/types/restartPolicy'
 import { RestartPolicyField } from '@/components/RestartPolicyField'
 import { useAppDialog } from '@/dialog/AppDialogContext'
 import { formatThrownEngineError } from '@/lib/alertMessage'

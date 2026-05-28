@@ -1,4 +1,4 @@
-import type { IpcResult } from '@shared/ipc'
+import type { IpcResult } from '@/types/ipc'
 
 export async function unwrapIpc<T>(p: Promise<IpcResult<T>>): Promise<T> {
   const r = await p

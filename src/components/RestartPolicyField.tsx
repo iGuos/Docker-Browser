@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next'
-import { RESTART_POLICY_NAMES, type RestartPolicyName } from '@shared/restartPolicy'
+import { RESTART_POLICY_NAMES, type RestartPolicyName } from '@/types/restartPolicy'
 
 type Props = {
   value: RestartPolicyName

@@ -9,21 +9,15 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': path.join(__dirname, 'src'),
-      '@shared': path.join(__dirname, 'shared'),
     },
   },
-  // Vite options for Tauri dev
   clearScreen: false,
   server: {
     port: 5173,
     strictPort: false,
     host: host || false,
     hmr: host
-      ? {
-          protocol: 'ws',
-          host,
-          port: 5183,
-        }
+      ? { protocol: 'ws', host, port: 5183 }
       : undefined,
     watch: {
       ignored: ['**/src-tauri/**'],

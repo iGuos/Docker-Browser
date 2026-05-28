@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next'
 import { useTheme } from '@/theme/ThemeProvider'
-import type { ThemePreference } from '@shared/theme'
+import type { ThemePreference } from '@/types/theme'
 
 export function ThemeSwitcher() {
   const { preference, setPreference } = useTheme()

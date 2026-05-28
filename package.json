@@ -1,6 +1,5 @@
 {
   "name": "docker-browser",
-  "onlyBuiltDependencies": ["esbuild"],
   "version": "0.1.0",
   "description": "Docker Browser — Tauri desktop client for local Docker Engine management.",
   "author": "Guo's",

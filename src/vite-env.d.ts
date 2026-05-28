@@ -1,14 +1,14 @@
 /// <reference types="vite/client" />
 
-import type { HostMetrics } from '../shared/hostMetrics'
-import type { RunningContainersMemorySummary } from '../shared/dockerMemorySummary'
-import type { AppUpdateStatus } from '../shared/appUpdateStatus'
-import type { DockerEventChunk } from '../shared/dockerEvents'
-import type { DockerLogsChunk } from '../shared/dockerLogs'
-import type { DockerExecPtyData, DockerExecPtyExit } from '../shared/dockerExecPty'
-import type { IpcResult } from '../shared/ipc'
-import type { AppLanguage } from '../shared/locale'
-import type { ThemePreference } from '../shared/theme'
+import type { HostMetrics } from './types/hostMetrics'
+import type { RunningContainersMemorySummary } from './types/dockerMemorySummary'
+import type { AppUpdateStatus } from './types/appUpdateStatus'
+import type { DockerEventChunk } from './types/dockerEvents'
+import type { DockerLogsChunk } from './types/dockerLogs'
+import type { DockerExecPtyData, DockerExecPtyExit } from './types/dockerExecPty'
+import type { IpcResult } from './types/ipc'
+import type { AppLanguage } from './types/locale'
+import type { ThemePreference } from './types/theme'
 
 export interface DockerDesktopApi {
   ping(): Promise<IpcResult<string>>

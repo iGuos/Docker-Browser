@@ -22,7 +22,7 @@ import {
   sortToolsAsciiAsc,
   type DockerRunTool,
 } from '@/lib/dockerRunPresets'
-import type { RestartPolicyName } from '@shared/restartPolicy'
+import type { RestartPolicyName } from '@/types/restartPolicy'
 
 const SORTED_RUN_TOOLS_INIT = sortToolsAsciiAsc(DOCKER_RUN_TOOLS)
 

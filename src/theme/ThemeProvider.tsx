@@ -13,7 +13,7 @@ import {
   parseThemePreference,
   THEME_STORAGE_KEY,
   type ThemePreference,
-} from '@shared/theme'
+} from '@/types/theme'
 
 type ThemeContextValue = {
   preference: ThemePreference

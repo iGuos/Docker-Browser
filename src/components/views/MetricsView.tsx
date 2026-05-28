@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import type { HostMetrics } from '@shared/hostMetrics'
-import type { RunningContainersMemorySummary } from '@shared/dockerMemorySummary'
+import type { HostMetrics } from '@/types/hostMetrics'
+import type { RunningContainersMemorySummary } from '@/types/dockerMemorySummary'
 import { useDockerStore } from '@/stores/dockerStore'
 
 const CARD =
