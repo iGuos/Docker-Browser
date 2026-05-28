@@ -196,35 +196,13 @@ export const dockerDesktop = {
     return () => { unlisten?.() }
   },
 
-  // Multi-window (Tauri: open separate windows)
-  openContainerLogsWindow: async (containerId: string): Promise<IpcResult<void>> => {
-    const { WebviewWindow } = await import('@tauri-apps/api/webviewWindow')
-    new WebviewWindow(`logs-${containerId}`, {
-      url: `/#/logs?containerId=${containerId}`,
-      title: 'Container Logs',
-      width: 920, height: 640, minWidth: 400, minHeight: 280,
-    })
-    return ok(undefined)
-  },
-  openContainerExecWindow: async (containerId: string): Promise<IpcResult<void>> => {
-    const { WebviewWindow } = await import('@tauri-apps/api/webviewWindow')
-    new WebviewWindow(`exec-${containerId}`, {
-      url: `/#/exec?containerId=${containerId}`,
-      title: 'Container Terminal',
-      width: 800, height: 500, minWidth: 400, minHeight: 300,
-    })
-    return ok(undefined)
-  },
-  openContainerFilesWindow: async (containerId: string, initialPath?: string): Promise<IpcResult<void>> => {
-    const { WebviewWindow } = await import('@tauri-apps/api/webviewWindow')
-    const q = initialPath ? `&path=${encodeURIComponent(initialPath)}` : ''
-    new WebviewWindow(`files-${containerId}`, {
-      url: `/#/files?containerId=${containerId}${q}`,
-      title: 'Container Files',
-      width: 900, height: 620, minWidth: 400, minHeight: 300,
-    })
-    return ok(undefined)
-  },
+  // Multi-window：由 Rust 后端用 WebviewWindowBuilder 创建，避免前端权限限制
+  openContainerLogsWindow: (containerId: string) =>
+    call<void>('open_container_logs_window', { containerId }),
+  openContainerExecWindow: (containerId: string) =>
+    call<void>('open_container_exec_window', { containerId }),
+  openContainerFilesWindow: (containerId: string, initialPath?: string) =>
+    call<void>('open_container_files_window', { containerId, initialPath }),
 
   // App updates
   checkForUpdates: () => call<void>('plugin:updater|check'),

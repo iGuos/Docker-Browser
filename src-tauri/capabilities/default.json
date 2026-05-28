@@ -2,7 +2,7 @@
   "$schema": "../node_modules/@tauri-apps/cli/schema/acl/capability.schema.json",
   "identifier": "default",
   "description": "Default capabilities for Docker Browser",
-  "windows": ["main"],
+  "windows": ["main", "logs-*", "exec-*", "files-*"],
   "permissions": [
     "core:default",
     "dialog:default",

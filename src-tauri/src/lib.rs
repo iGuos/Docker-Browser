@@ -98,6 +98,10 @@ pub fn run() {
             commands::docker_cli::create_and_restart_from_docker_run_cli,
             commands::docker_cli::build_and_run_from_dockerfile,
             commands::docker_cli::compose_up_from_yaml,
+            // Multi-window
+            commands::windows::open_container_logs_window,
+            commands::windows::open_container_exec_window,
+            commands::windows::open_container_files_window,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
