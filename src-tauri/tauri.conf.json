@@ -1,0 +1,46 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Docker Browser",
+  "version": "0.1.0",
+  "identifier": "com.dockerbrowser.desktop",
+  "build": {
+    "frontendDist": "../dist",
+    "devUrl": "http://localhost:1420",
+    "beforeDevCommand": "pnpm dev:web",
+    "beforeBuildCommand": "pnpm build"
+  },
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "title": "Docker Browser",
+        "width": 1240,
+        "height": 780,
+        "minWidth": 960,
+        "minHeight": 560
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDZCMEI2OTY1RjFCRDZDQUEKUldTcWJMM3haV2tMYTBxVThnUllqUFl5K0c0VFQ0U0ZJNFZPK3pNaWdXWWp3UG5vZ0tzMzVZOHAK",
+      "endpoints": [
+        "https://github.com/unicorngithub/Docker-Browser/releases/latest/download/latest.json"
+      ]
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ]
+  }
+}

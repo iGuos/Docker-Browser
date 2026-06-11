@@ -1,5 +1,6 @@
-# 推送以 v 开头的 tag（如 v0.1.0）时：在 Windows / macOS 上打包并创建 GitHub Release，附件为安装包。
-# 构建前会用 tag 自动写入 package.json 的 version（v0.1.0 -> 0.1.0），仓库里的 version 仅作日常开发占位即可。
+# 推送以 v 开头的 tag（如 v0.1.0）时：在 macOS / Windows / Linux 上用 Tauri 打包并创建 GitHub Release。
+# 更新包签名：在仓库 Secrets 配置 TAURI_SIGNING_PRIVATE_KEY（与 tauri.conf.json 的 plugins.updater.pubkey 对应）
+# 及可选的 TAURI_SIGNING_PRIVATE_KEY_PASSWORD。
 name: Release
 
 on:
@@ -11,18 +12,28 @@ permissions:
   contents: write
 
 jobs:
-  build:
+  release:
     strategy:
       fail-fast: false
       matrix:
         include:
-          - os: windows-latest
-            label: windows
           - os: macos-latest
-            label: macos
+            args: '--target aarch64-apple-darwin'
+          - os: macos-latest
+            args: '--target x86_64-apple-darwin'
+          - os: windows-latest
+            args: ''
+          - os: ubuntu-latest
+            args: ''
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v6
+
+      - name: Install Tauri system dependencies (Linux)
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libgtk-3-dev librsvg2-dev libayatana-appindicator3-dev patchelf
 
       - uses: pnpm/action-setup@v5
         with:
@@ -33,69 +44,30 @@ jobs:
           node-version: '24'
           cache: 'pnpm'
 
-      - run: pnpm install --frozen-lockfile
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.os == 'macos-latest' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
+
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
 
       - name: Sync package version from git tag
         env:
           GITHUB_REF_NAME: ${{ github.ref_name }}
         run: node scripts/sync-version-from-tag.mjs
 
-      - name: Typecheck
-        run: pnpm typecheck
-
-      - name: Test build
-        run: pnpm run pretest
-
-      - name: Vitest (unit)
-        run: pnpm exec vitest run --exclude test/e2e.spec.ts
-
-      - name: Package
-        run: pnpm dist
-
-      - uses: actions/upload-artifact@v7
-        with:
-          name: package-${{ matrix.label }}
-          path: release/
-          if-no-files-found: error
-
-  publish:
-    needs: build
-    runs-on: ubuntu-latest
-    steps:
-      # 先检出 macOS 排障文档，再下载 artifact，避免工作区已有 dist/ 时 checkout 失败
-      - uses: actions/checkout@v6
-        with:
-          ref: ${{ github.ref }}
-          sparse-checkout: |
-            docs/macOS-install-troubleshooting.md
-          sparse-checkout-cone-mode: false
-
-      - uses: actions/download-artifact@v8
-        with:
-          path: dist
-          pattern: package-*
-          merge-multiple: true
-
-      # 只上传：exe / dmg / zip + 更新元数据 + macOS 安装说明；勿用 dist/**/*（会带上 win-unpacked 等大量文件）。
-      - uses: softprops/action-gh-release@v3
-        with:
-          draft: false
-          generate_release_notes: true
-          body: |
-            ## macOS 安装说明
-
-            本应用当前**未经 Apple 公证**。若提示「已损坏」或无法打开，请先对已安装的 `.app` 清除隔离：
-
-            ```bash
-            sudo xattr -r -d com.apple.quarantine "/Applications/Docker Browser.app"
-            ```
-
-            完整步骤见本 Release 附件：`macOS-install-troubleshooting.md`
-          files: |
-            dist/**/Docker-Browser_*.exe
-            dist/**/Docker-Browser_*.dmg
-            dist/**/Docker-Browser_*.zip
-            dist/**/latest*.yml
-            docs/macOS-install-troubleshooting.md
+      - uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        with:
+          tagName: ${{ github.ref_name }}
+          releaseName: 'Docker Browser ${{ github.ref_name }}'
+          releaseDraft: false
+          generateReleaseNotes: true
+          args: ${{ matrix.args }}

@@ -1,0 +1,55 @@
+[package]
+name = "docker-browser"
+version = "0.1.0"
+description = "Docker Browser — Tauri desktop client for local Docker Engine management."
+authors = ["Guo's"]
+edition = "2021"
+rust-version = "1.77"
+
+# 库 + 可执行：lib 承载 run()，bin 仅调用 run()，便于集成测试与移动端复用。
+[lib]
+name = "docker_browser_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[[bin]]
+name = "docker-browser"
+path = "src/main.rs"
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = ["devtools"] }
+tauri-plugin-dialog = "2"
+tauri-plugin-opener = "2"
+tauri-plugin-updater = "2"
+tauri-plugin-single-instance = "2"
+
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+tokio = { version = "1", features = ["full"] }
+futures-util = "0.3"
+
+# Docker Engine API 客户端（替代 dockerode/docker-modem）
+bollard = "0.18"
+
+# 交互式终端（替代 node-pty），spawn 解析出的 docker 二进制
+portable-pty = "0.9"
+
+# 容器文件系统 tar 打包/解包（getArchive / putArchive）
+tar = "0.4"
+
+base64 = "0.22"
+uuid = { version = "1", features = ["v4"] }
+
+# 主机指标（CPU/内存/uptime/loadavg，替代 Node os 模块）
+sysinfo = "0.33"
+
+bytes = "1"
+thiserror = "2"
+
+[features]
+# 默认启用自定义协议（生产构建从 frontendDist 加载）
+default = ["custom-protocol"]
+custom-protocol = ["tauri/custom-protocol"]

@@ -1,0 +1,4 @@
+# Rust 构建产物
+/target/
+# Tauri 生成的 schema/acl 等
+/gen/schemas/

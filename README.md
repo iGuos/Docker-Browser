@@ -32,14 +32,33 @@
 - 若设置了 `DOCKER_HOST` / `DOCKER_CONTEXT`，应用会跟随该配置连接目标引擎。
 - 远程 TLS 场景请同时配置 `DOCKER_TLS_VERIFY`、`DOCKER_CERT_PATH` 等环境变量后重启应用。
 
+## 技术栈说明（Tauri 迁移）
+
+> 本分支 `tauri-migration` 将桌面外壳从 **Electron** 迁移到 **Tauri v2**（Rust 后端）。
+> 前端（React + Vite + TS）保持不变；原 Node 后端（dockerode / node-pty / child_process）
+> 已用 Rust 等价物全量重写：
+>
+> - Docker API → [`bollard`](https://crates.io/crates/bollard)
+> - 交互式终端 → [`portable-pty`](https://crates.io/crates/portable-pty)
+> - `docker run/build/compose` 编排 → `tokio::process`
+> - 文件对话框 / 外链 / 自动更新 / 多窗口 / 菜单 → Tauri v2 插件与 API
+>
+> Rust 后端位于 [`src-tauri/`](src-tauri/)。前端通过 [`src/lib/backendBridge.ts`](src/lib/backendBridge.ts)
+> 用 `invoke`/`listen` 重建 `window.dockerDesktop` 等对象，方法签名与原 Electron preload 完全一致，
+> 返回统一的 `IpcResult<T>`，因此前端调用点零改动。`main` 分支仍保留 Electron 实现。
+
 ## 快速开始（开发）
 
 ```bash
 pnpm install
-pnpm dev
+pnpm dev          # 启动桌面客户端（Vite + Tauri 原生窗口）；请确认 Docker 可访问
+
+# 仅前端调试（浏览器，无后端、无窗口）
+pnpm dev:web
 ```
 
-开发模式会同时启动 Vite 与 Electron。请确认 Docker 可访问。
+首次 `pnpm dev` 会编译 Rust 依赖，耗时较长；之后为增量编译。
+需要本机 **Rust 工具链**（rustc/cargo）。
 
 ## 常用脚本
 
@@ -47,30 +66,33 @@ pnpm dev
 # 类型检查
 pnpm typecheck
 
-# 构建（renderer + electron main/preload）
+# 构建前端产物（dist/）
 pnpm build
 
 # 测试（Vitest）
 pnpm test
 
-# 产物打包
-pnpm dist
+# 启动桌面客户端 / 打包安装包
+pnpm dev
+pnpm tauri:build
 ```
 
 ## 打包与发布
 
-### 本地打包
+### Tauri 打包
 
 ```bash
-pnpm dist
+pnpm tauri:build
 ```
 
-- Windows 打包前会自动执行 `scripts/gen-icon-ico.mjs`：从 `public/icon.png` 生成 `build/icon.ico`，供 `exe` / NSIS 安装向导嵌入（避免仅用 PNG 时资源管理器里图标异常）。
-- 输出目录由 `electron-builder.json` 的 `directories.output` 定义（默认：`release/<version>`）。
-- Windows 产物：NSIS 安装包（`.exe`）。
-- macOS 产物：`.dmg` 与 `.zip`（需在 macOS 环境构建）。
-- **Windows 本地打包**：`pnpm dist` 会为 Electron 重编 `node-pty`（`electron-rebuild`）。若提示 **Could not find any Visual Studio** / `node-gyp` 失败，请安装 **Visual Studio Build Tools**，并勾选 **「使用 C++ 的桌面开发」** 工作负载（与 [node-gyp Windows 说明](https://github.com/nodejs/node-gyp#on-windows) 一致）。若报 **MSB8040（Spectre-mitigated libraries are required）**，还需在「单个组件」安装 **MSVC v143 Spectre-mitigated libs (x86 & x64)**。GitHub Actions 的 `windows-latest` 镜像已自带该环境。
-- **依赖锁定**：`package.json` 的 `pnpm.overrides` 将 `builder-util-runtime` 固定为 `9.5.1`，降低 electron-builder 传递依赖版本漂移风险。完整清理重打包可用 `pnpm rebuild`（等同 `pnpm clean && pnpm dist`）。
+- 产物为各平台原生安装包（macOS `.dmg`/`.app`、Windows `.msi`/NSIS、Linux `.deb`/AppImage），由 `src-tauri/tauri.conf.json` 的 `bundle` 配置。
+- **自动更新**：`tauri.conf.json` 的 `plugins.updater` 已内置签名公钥；生成更新包需在构建时提供私钥环境变量
+  `TAURI_SIGNING_PRIVATE_KEY`（密钥文件见 `~/.tauri/docker-browser-updater.key`，请妥善保管，勿提交仓库），
+  并按需将 `bundle.createUpdaterArtifacts` 置为 `true`、把 `endpoints` 指向实际发布地址。
+- 体积显著小于旧 Electron 版（无随包 Node 运行时）。
+- Linux 构建需安装 Tauri 系统依赖（`libwebkit2gtk-4.1-dev`、`libgtk-3-dev` 等，见 [Tauri 文档](https://tauri.app/start/prerequisites/)）。
+
+> 旧的 Electron 打包流程（`electron-builder`）已从本分支移除,如需参考请查看 `main` 分支。
 
 ### macOS：无法安装或提示「已损坏」
 
@@ -94,18 +116,21 @@ sudo xattr -r -d com.apple.quarantine ~/Applications/Docker\ Browser.app
 
 ### GitHub Release（CI）
 
-- 推送 tag `v*`（例如 `v0.1.0`）会触发 `.github/workflows/release.yml`。
-- 工作流会自动将 tag 同步到 `package.json.version`（通过 `scripts/sync-version-from-tag.mjs`）。
-- 构建并上传安装包到 GitHub Release。
+- 推送 tag `v*`（例如 `v0.1.0`）会触发 `.github/workflows/release.yml`，使用 [`tauri-action`](https://github.com/tauri-apps/tauri-action) 在 macOS / Windows / Linux 上打包并创建 GitHub Release。
+- 工作流会先用 tag 同步 `package.json.version`（`scripts/sync-version-from-tag.mjs`）；`src-tauri/tauri.conf.json` 的 `version` 也需对应升级。
+- 自动更新签名：在仓库 **Secrets** 配置 `TAURI_SIGNING_PRIVATE_KEY`（与 `plugins.updater.pubkey` 对应）及可选 `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`，并将 `bundle.createUpdaterArtifacts` 置为 `true`。
+- 每次推送 / PR 由 `.github/workflows/ci.yml` 跑前端类型检查 + Vitest 与 Rust 编译。
 
 ## 项目结构（简）
 
 ```text
-src/                # 渲染进程（React UI）
-electron/main/      # Electron 主进程与 Docker IPC
-electron/preload/   # 安全桥接 API（window.dockerDesktop）
-shared/             # 前后端共享类型与常量
-scripts/            # 构建/发布辅助脚本
+src/                # 前端（React UI）
+src/lib/backendBridge.ts  # invoke/listen 桥，重建 window.dockerDesktop 等
+src-tauri/          # Rust 后端（Tauri）
+  src/docker/       # Docker 命令：容器/镜像/网络/卷/日志/事件/exec/CLI/文件系统（bollard + portable-pty）
+  src/app/          # 应用壳层：窗口/菜单/对话框/主机指标/引擎 bootstrap/更新
+shared/             # 前端共享类型与常量（IPC 契约、通道名）
+scripts/            # 辅助脚本
 ```
 
 ## 故障排查
